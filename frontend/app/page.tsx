@@ -4,6 +4,7 @@ import LocationForm from "@/components/LocationForm";
 import PreviewCanvas from "@/components/PreviewCanvas";
 import TextEditor from "@/components/TextEditor";
 import ExportBar from "@/components/ExportBar";
+import ReviewPanel from "@/components/ReviewPanel";
 import {
   MapConfig, Personalization, PreviewView, emptyEl, fetchPreview,
 } from "@/lib/api";
@@ -19,7 +20,11 @@ const defaultPersonalization = (): Personalization => ({
   wood_text: "",
 });
 
+// Akış: design (1. ve 2. adım) -> review (3. adım: büyük önizleme + onay) -> approved
+type Stage = "design" | "review" | "approved";
+
 export default function Home() {
+  const [stage, setStage] = useState<Stage>("design");
   const [config, setConfig] = useState<MapConfig | null>(null);
   const [pers, setPers] = useState<Personalization>(defaultPersonalization());
   const [svg, setSvg] = useState<string>("");
@@ -52,6 +57,18 @@ export default function Home() {
     if (config) refresh(config, pers, view);
   }, [config, pers, view, refresh]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [stage]);
+
+  // Sipariş ver ancak tasarım üretilebilir durumdaysa açılır
+  const orderDisabledReason =
+    loading || !svg ? "Önizleme hazırlanıyor…"
+    : overflow ? "Lamba yazıları alana sığmıyor"
+    : pers.wood_engraving && !pers.wood_text.trim() ? "Ahşap kazıma yazısını girin"
+    : woodOverflow ? "Ahşap yazısı alana sığmıyor"
+    : "";
+
   return (
     <main className="min-h-screen bg-night text-cream pb-40">
       <header className="px-5 pt-8 pb-4 text-center">
@@ -60,24 +77,45 @@ export default function Home() {
         <p className="mt-1 text-sm text-cream/50">O geceyi, o gökyüzünü tasarla</p>
       </header>
 
-      <div className="mx-auto max-w-md px-4 space-y-4 md:max-w-5xl md:grid md:grid-cols-[1fr_380px] md:gap-6 md:space-y-0 md:items-start">
-        {/* Önizleme — mobilde üstte yapışkan */}
-        <section className="md:order-2 md:sticky md:top-4">
-          <PreviewCanvas
-            svg={svg} loading={loading} error={error} hasConfig={!!config}
-            view={view} onViewChange={setView}
-          />
-        </section>
+      {stage !== "design" && config && (
+        <ReviewPanel
+          svg={svg} loading={loading} error={error}
+          view={view} onViewChange={setView}
+          config={config} pers={pers}
+          approved={stage === "approved"}
+          onBack={() => setStage("design")}
+          onApprove={() => setStage("approved")}
+        />
+      )}
 
-        {/* Adımlar sırayla: 1) konum/tarih -> yıldız haritası, 2) kişiselleştirme.
-            Harita oluşunca 1. adım tek satıra kapanır, yazarken kaydırma gerekmez. */}
-        <section className="space-y-4 md:order-1">
-          <LocationForm onResolved={setConfig} />
-          {config && <TextEditor pers={pers} onChange={setPers} overflow={overflow} woodOverflow={woodOverflow} />}
-        </section>
+      {/* Tasarım adımları onay ekranında da bağlı kalır (gizli): geri dönünce
+          1. adımın seçimleri kaybolmaz */}
+      <div className={`mx-auto max-w-md px-4 space-y-4 md:max-w-5xl md:grid md:grid-cols-[1fr_380px] md:gap-6 md:space-y-0 md:items-start ${
+        stage === "design" ? "" : "hidden md:hidden"
+      }`}>
+          {/* Önizleme — mobilde üstte */}
+          <section className="md:order-2 md:sticky md:top-4">
+            <PreviewCanvas
+              svg={svg} loading={loading} error={error} hasConfig={!!config}
+              view={view} onViewChange={setView}
+            />
+          </section>
+
+          {/* Adımlar sırayla: 1) konum/tarih -> yıldız haritası, 2) kişiselleştirme.
+              Harita oluşunca 1. adım tek satıra kapanır, yazarken kaydırma gerekmez. */}
+          <section className="space-y-4 md:order-1">
+            <LocationForm onResolved={setConfig} />
+            {config && <TextEditor pers={pers} onChange={setPers} overflow={overflow} woodOverflow={woodOverflow} />}
+          </section>
       </div>
 
-      {config && <ExportBar config={config} pers={pers} blocked={overflow} woodBlocked={woodOverflow} />}
+      {config && stage === "design" && (
+        <ExportBar
+          config={config} pers={pers} blocked={overflow} woodBlocked={woodOverflow}
+          orderDisabledReason={orderDisabledReason}
+          onOrder={() => { setView("mockup"); setStage("review"); }}
+        />
+      )}
     </main>
   );
 }

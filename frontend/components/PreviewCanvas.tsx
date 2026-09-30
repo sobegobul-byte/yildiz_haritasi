@@ -7,7 +7,7 @@ const VIEWS: { id: PreviewView; label: string }[] = [
 ];
 
 export default function PreviewCanvas({
-  svg, loading, error, hasConfig, view, onViewChange,
+  svg, loading, error, hasConfig, view, onViewChange, large = false,
 }: {
   svg: string;
   loading: boolean;
@@ -15,6 +15,7 @@ export default function PreviewCanvas({
   hasConfig: boolean;
   view: PreviewView;
   onViewChange: (v: PreviewView) => void;
+  large?: boolean;   // onay ekranı: masaüstünde ekran yüksekliğine sığacak kadar büyük
 }) {
   return (
     <div className="relative rounded-2xl border border-cream/10 bg-nightdeep/50 p-3">
@@ -46,7 +47,9 @@ export default function PreviewCanvas({
         </div>
       ) : (
         <div
-          className="rounded-xl overflow-hidden shadow-2xl [&>svg]:w-full [&>svg]:h-auto"
+          className={`rounded-xl overflow-hidden shadow-2xl [&>svg]:w-full [&>svg]:h-auto ${
+            large ? "md:flex md:justify-center md:bg-[#0a0604] md:[&>svg]:w-auto md:[&>svg]:max-w-full md:[&>svg]:h-[calc(100vh-240px)]" : ""
+          }`}
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       )}
