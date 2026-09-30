@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from .models import LocationQuery, PreviewRequest, ExportRequest
-from .template import TEMPLATES, compose_svg
+from .template import TEMPLATES, compose_svg, compose_mockup_svg
 from .starmap import render_star_layer
 from .exporters import build_pdf, build_dxf
 from .geocode import geocode, format_coords
@@ -37,7 +37,7 @@ async def api_geocode(q: LocationQuery):
     return res
 
 
-def _compose(req: PreviewRequest) -> str:
+def _compose(req: PreviewRequest, view: str = "flat") -> str:
     tpl = TEMPLATES.get(req.template_id)
     if not tpl:
         raise HTTPException(status_code=404, detail="Şablon bulunamadı")
@@ -52,12 +52,14 @@ def _compose(req: PreviewRequest) -> str:
     star_layer = render_star_layer(
         tpl, c.location.lat, c.location.lon, c.date, c.time,
         c.location.timezone_offset_hours, c.mag_limit, c.show_constellations)
+    if view == "mockup" and tpl.shape == "lamp":
+        return compose_mockup_svg(tpl, star_layer, p)
     return compose_svg(tpl, star_layer, p)
 
 
 @app.post("/api/preview")
 def api_preview(req: PreviewRequest):
-    svg = _compose(req)
+    svg = _compose(req, req.view)
     return Response(content=svg, media_type="image/svg+xml")
 
 

@@ -63,11 +63,18 @@ export async function geocode(country: string, province: string, district: strin
   return r.json();
 }
 
-export async function fetchPreview(config: MapConfig, personalization: Personalization) {
+// "mockup" = isikli urun gorunumu, "flat" = uretim cizimi (PDF/DXF ile birebir)
+export type PreviewView = "mockup" | "flat";
+
+export async function fetchPreview(
+  config: MapConfig,
+  personalization: Personalization,
+  view: PreviewView = "mockup"
+) {
   const r = await fetch("/api/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ config, personalization, template_id: "yummy-lamp" }),
+    body: JSON.stringify({ config, personalization, template_id: "yummy-lamp", view }),
   });
   if (!r.ok) throw new Error("Önizleme oluşturulamadı");
   return r.text(); // SVG string

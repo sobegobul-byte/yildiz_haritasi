@@ -285,3 +285,128 @@ def compose_svg(tpl: Template, star_layer_svg: str, personalization) -> str:
   <!-- kisisellestirme metin katmani -->
   {text_layer}
 </svg>'''
+
+
+def compose_mockup_svg(tpl: Template, star_layer_svg: str, personalization) -> str:
+    """Musteriye gosterilen isikli urun gorunumu (sadece onizleme).
+    Ayni kesim/yildiz/metin geometrisi kullanilir; yalnizca gorunum farklidir:
+    LED ile aydinlanan akrilik, sicak parlama, ahsap taban ve loş oda ortami.
+    Uretim dosyalari (PDF/DXF) bundan etkilenmez."""
+    k = tpl.width / tpl.print_w_mm
+    outline = lamp_cut_path(k)
+    area = star_area_path(tpl)
+    text_layer = render_text_layer(tpl, personalization)
+
+    cx = tpl.width / 2
+    slot_y = LAMP_MM["bar_bot"] * k + 4          # akrilik tabana bu cizgide girer
+    base_l, base_r = 8 * k, (LAMP_MM["W"] - 8) * k
+    base_w = base_r - base_l
+    top_h = 44                                   # taban ust yuzeyi (perspektif)
+    top_y = slot_y - top_h / 2
+    front_b = slot_y + 96                        # taban on yuzu alt kenari
+
+    # tuval: urunun cevresinde ortam icin bosluk
+    vx, vy = -60, -50
+    vw, vh = tpl.width + 120, front_b + 90 - vy
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" class="lamp-mockup"
+     viewBox="{vx} {vy} {vw} {vh}" width="{vw}" height="{vh}">
+  <defs>
+    <style>
+      .lamp-mockup .stars circle {{ fill: #fff6e2; }}
+      .lamp-mockup .stars path {{ stroke: #ffe1ad; stroke-width: 1.3; opacity: 0.85; }}
+      .lamp-mockup .txt text {{ fill: #fff3dc; }}
+    </style>
+    <radialGradient id="mRoom" cx="50%" cy="42%" r="75%">
+      <stop offset="0" stop-color="#3b2413"/>
+      <stop offset="0.45" stop-color="#1c110a"/>
+      <stop offset="1" stop-color="#0a0604"/>
+    </radialGradient>
+    <radialGradient id="mHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffb866" stop-opacity="0.34"/>
+      <stop offset="0.6" stop-color="#ff9a3c" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#ff9a3c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mAcrylic" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe6c0" stop-opacity="0.05"/>
+      <stop offset="0.7" stop-color="#ffd49a" stop-opacity="0.09"/>
+      <stop offset="1" stop-color="#ffc47a" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="mWoodFront" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5a3517"/>
+      <stop offset="0.3" stop-color="#9a6531"/>
+      <stop offset="0.55" stop-color="#b47a3f"/>
+      <stop offset="1" stop-color="#5e3818"/>
+    </linearGradient>
+    <linearGradient id="mWoodShade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.45"/>
+    </linearGradient>
+    <linearGradient id="mWoodTop" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8c5a2a"/>
+      <stop offset="0.5" stop-color="#d09a5a"/>
+      <stop offset="1" stop-color="#8c5a2a"/>
+    </linearGradient>
+    <radialGradient id="mSlotGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffd08a" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#ffb060" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mTable" cx="50%" cy="0%" r="100%">
+      <stop offset="0" stop-color="#ffb866" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffb866" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="mGlow" x="-5%" y="-5%" width="110%" height="110%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="mEdge" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="mSoft"><feGaussianBlur stdDeviation="18"/></filter>
+    <filter id="mGrain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.35" numOctaves="2" seed="7"/>
+      <feColorMatrix values="0 0 0 0 0.18  0 0 0 0 0.09  0 0 0 0 0.03  0 0 0 0.9 -0.35"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+    <clipPath id="mStarArea"><path d="{area}"/></clipPath>
+    <clipPath id="mAboveSlot"><rect x="{vx}" y="{vy}" width="{vw}" height="{slot_y - vy}"/></clipPath>
+  </defs>
+
+  <!-- oda ortami -->
+  <rect x="{vx}" y="{vy}" width="{vw}" height="{vh}" fill="url(#mRoom)"/>
+  <ellipse cx="{cx}" cy="{tpl.circle_cy}" rx="{tpl.circle_r * 1.55}" ry="{tpl.circle_r * 1.45}" fill="url(#mHalo)"/>
+  <!-- masa yuzeyine vuran isik ve golge -->
+  <ellipse cx="{cx}" cy="{front_b}" rx="{base_w * 0.85}" ry="70" fill="url(#mTable)"/>
+  <ellipse cx="{cx}" cy="{front_b + 4}" rx="{base_w * 0.52}" ry="14" fill="#000" opacity="0.55" filter="url(#mSoft)"/>
+
+  <!-- ahsap taban: on yuz + ust yuz -->
+  <rect x="{base_l}" y="{slot_y}" width="{base_w}" height="{front_b - slot_y}" rx="26" fill="url(#mWoodFront)"/>
+  <rect x="{base_l}" y="{slot_y}" width="{base_w}" height="{front_b - slot_y}" rx="26" fill="#000" filter="url(#mGrain)"/>
+  <rect x="{base_l}" y="{slot_y}" width="{base_w}" height="{front_b - slot_y}" rx="26" fill="url(#mWoodShade)"/>
+  <rect x="{base_l}" y="{top_y}" width="{base_w}" height="{top_h}" rx="{top_h / 2}" fill="url(#mWoodTop)"/>
+  <rect x="{base_l}" y="{top_y}" width="{base_w}" height="{top_h}" rx="{top_h / 2}" fill="#000" filter="url(#mGrain)" opacity="0.7"/>
+  <ellipse cx="{cx}" cy="{slot_y}" rx="{base_w * 0.42}" ry="{top_h * 0.55}" fill="url(#mSlotGlow)"/>
+
+  <!-- akrilik plaka: tabana giren tirnak gizlenir -->
+  <g clip-path="url(#mAboveSlot)">
+    <path d="{outline}" fill="url(#mAcrylic)"/>
+
+    <!-- gravur: yildizlar ve takimyildiz cizgileri (LED ile isiyor) -->
+    <g class="stars" clip-path="url(#mStarArea)" filter="url(#mGlow)">
+      {star_layer_svg}
+    </g>
+    <path d="{area}" fill="none" stroke="#ffe4b8" stroke-width="1.6" opacity="0.8" filter="url(#mGlow)"/>
+
+    <!-- gravur: kisisellestirme metinleri -->
+    <g class="txt" filter="url(#mGlow)">
+      {text_layer}
+    </g>
+
+    <!-- akrilik kenarlari: LED isigi kenarlarda en parlak -->
+    <path d="{outline}" fill="none" stroke="#ffcf8c" stroke-width="3.2" opacity="0.9" filter="url(#mEdge)"/>
+    <path d="{outline}" fill="none" stroke="#fff3dc" stroke-width="1" opacity="0.9"/>
+  </g>
+  <line x1="{LAMP_MM['tab_l'] * k}" y1="{slot_y}" x2="{LAMP_MM['tab_r'] * k}" y2="{slot_y}"
+        stroke="#fff0d0" stroke-width="3" opacity="0.9" filter="url(#mEdge)"/>
+</svg>'''

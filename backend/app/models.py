@@ -51,6 +51,8 @@ class PreviewRequest(BaseModel):
     config: MapConfig
     personalization: Personalization = Personalization()
     template_id: str = "yummy-lamp"
+    # "mockup" = isikli urun gorunumu (sadece onizleme), "flat" = uretim cizimi
+    view: Literal["flat", "mockup"] = "flat"
 
 
 class ExportRequest(PreviewRequest):

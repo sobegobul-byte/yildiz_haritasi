@@ -5,7 +5,7 @@ import PreviewCanvas from "@/components/PreviewCanvas";
 import TextEditor from "@/components/TextEditor";
 import ExportBar from "@/components/ExportBar";
 import {
-  MapConfig, Personalization, emptyEl, fetchPreview,
+  MapConfig, Personalization, PreviewView, emptyEl, fetchPreview,
 } from "@/lib/api";
 
 const defaultPersonalization = (): Personalization => ({
@@ -21,17 +21,18 @@ export default function Home() {
   const [config, setConfig] = useState<MapConfig | null>(null);
   const [pers, setPers] = useState<Personalization>(defaultPersonalization());
   const [svg, setSvg] = useState<string>("");
+  const [view, setView] = useState<PreviewView>("mockup");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const debounce = useRef<ReturnType<typeof setTimeout>>();
 
-  const refresh = useCallback((cfg: MapConfig, p: Personalization) => {
+  const refresh = useCallback((cfg: MapConfig, p: Personalization, v: PreviewView) => {
     clearTimeout(debounce.current);
     debounce.current = setTimeout(async () => {
       try {
         setLoading(true);
         setError("");
-        setSvg(await fetchPreview(cfg, p));
+        setSvg(await fetchPreview(cfg, p, v));
       } catch (e: any) {
         setError(e.message || "Bir sorun oluştu");
       } finally {
@@ -41,8 +42,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (config) refresh(config, pers);
-  }, [config, pers, refresh]);
+    if (config) refresh(config, pers, view);
+  }, [config, pers, view, refresh]);
 
   return (
     <main className="min-h-screen bg-night text-cream pb-40">
@@ -55,7 +56,10 @@ export default function Home() {
       <div className="mx-auto max-w-md px-4 space-y-4 md:max-w-5xl md:grid md:grid-cols-[1fr_380px] md:gap-6 md:space-y-0 md:items-start">
         {/* Önizleme — mobilde üstte yapışkan */}
         <section className="md:order-2 md:sticky md:top-4">
-          <PreviewCanvas svg={svg} loading={loading} error={error} hasConfig={!!config} />
+          <PreviewCanvas
+            svg={svg} loading={loading} error={error} hasConfig={!!config}
+            view={view} onViewChange={setView}
+          />
         </section>
 
         {/* Kontroller — gökyüzü oluşunca kişiselleştirme üste alınır ki
