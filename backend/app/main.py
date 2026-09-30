@@ -4,7 +4,9 @@ import json
 import secrets
 from datetime import datetime
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from typing import Literal
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
@@ -113,11 +115,34 @@ def api_export_wood_dxf(req: ExportRequest):
 
 # ---------------------------------------------------------------------------
 # Siparis: musteri tasarimi onaylayinca uretim dosyalari bu bilgisayara kaydedilir.
-# backend/orders/<siparis-no>/ : siparis.json, lamba.pdf, lamba.dxf,
-# ahsap-yazi.dxf (varsa), onizleme.svg (musterinin onayladigi urun gorunumu)
+# Durum klasorleri (tasarim klasoru durum degistikce tasinir):
+#   backend/orders/pending/<no>/    tasarim onaylandi
+#   backend/orders/cart/<no>/       musteri sepete ekledi / hizli satin al'a bast
+#   backend/orders/completed/<no>/  satin alindi (bu bilgisayardan isaretlenir)
+# Icerik: siparis.json, lamba.pdf, lamba.dxf, ahsap-yazi.dxf (varsa), onizleme.svg
 # ---------------------------------------------------------------------------
 ORDERS_DIR = Path(__file__).resolve().parent.parent / "orders"
+STATUSES = ("pending", "cart", "completed")
 WOOD_ENGRAVING_PRICE = 49.90
+
+
+def _find_order(order_id: str) -> tuple[str, Path] | None:
+    if not order_id.replace("-", "").isalnum():      # yol enjeksiyonuna karsi
+        return None
+    for st in STATUSES:
+        d = ORDERS_DIR / st / order_id
+        if d.is_dir():
+            return st, d
+    return None
+
+
+def _log_status(d: Path, status: str, **extra):
+    f = d / "siparis.json"
+    data = json.loads(f.read_text(encoding="utf-8"))
+    data["status"] = status
+    data.setdefault("history", []).append(
+        {"status": status, "at": datetime.now().isoformat(timespec="seconds"), **extra})
+    f.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 @app.post("/api/orders")
@@ -135,7 +160,7 @@ def api_create_order(req: PreviewRequest):
 
     now = datetime.now()
     order_id = now.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(2).upper()
-    d = ORDERS_DIR / order_id
+    d = ORDERS_DIR / "pending" / order_id
     d.mkdir(parents=True, exist_ok=False)
 
     (d / "onizleme.svg").write_text(mockup, encoding="utf-8")
@@ -160,6 +185,36 @@ def api_create_order(req: PreviewRequest):
         "extra_price": extra,
     }
     (d / "siparis.json").write_text(
-        json.dumps({**summary, "request": req.model_dump()}, ensure_ascii=False, indent=2),
+        json.dumps({**summary, "status": "pending", "request": req.model_dump()},
+                   ensure_ascii=False, indent=2),
         encoding="utf-8")
+    _log_status(d, "pending")
     return summary
+
+
+class StatusUpdate(BaseModel):
+    status: Literal["cart", "completed"]
+    action: Literal["add-to-cart", "buy-now", "manual"] = "manual"
+
+
+@app.post("/api/orders/{order_id}/status")
+def api_order_status(order_id: str, body: StatusUpdate, request: Request):
+    """Tasarim klasorunu durum klasorune tasir.
+    - cart: musterinin tarayicisindan (Sepete Ekle / Hizli Satin Al) gelir.
+    - completed: sadece BU bilgisayardan dogrudan (127.0.0.1:8000) yapilabilir;
+      tunel -> Next.js uzerinden gelen istekler x-forwarded-* basligi tasir ve reddedilir.
+    Durum yalnizca ileri gider: pending -> cart -> completed."""
+    found = _find_order(order_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="Tasarım bulunamadı")
+    cur, d = found
+    via_proxy = any(h in request.headers for h in ("x-forwarded-for", "x-forwarded-host"))
+    if body.status == "completed" and via_proxy:
+        raise HTTPException(status_code=403, detail="Tamamlandı durumu yalnızca yerelden işaretlenir")
+    if STATUSES.index(body.status) <= STATUSES.index(cur):
+        return {"order_id": order_id, "status": cur}          # geri gitmez, tekrar zararsiz
+    target = ORDERS_DIR / body.status / order_id
+    target.parent.mkdir(parents=True, exist_ok=True)
+    d.rename(target)
+    _log_status(target, body.status, action=body.action)
+    return {"order_id": order_id, "status": body.status}

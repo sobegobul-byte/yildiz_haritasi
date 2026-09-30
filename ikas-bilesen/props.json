@@ -31,10 +31,10 @@
   "defaultValue": "min(100vh, 900px)"
  },
  {
-  "name": "autoAddToCart",
-  "displayName": "Onaylanınca sepete ekle",
-  "type": "BOOLEAN",
-  "defaultValue": true
+  "name": "cartPath",
+  "displayName": "Sepet sayfası adresi",
+  "type": "TEXT",
+  "defaultValue": "/cart"
  },
  {
   "name": "frameTitle",
@@ -46,25 +46,19 @@
   "name": "addingText",
   "displayName": "Sepete ekleniyor",
   "type": "TEXT",
-  "defaultValue": "Tasarımınız onaylandı, sepete ekleniyor…"
+  "defaultValue": "Tasarımınız sepete ekleniyor…"
  },
  {
-  "name": "addedText",
-  "displayName": "Sepete eklendi",
+  "name": "redirectingText",
+  "displayName": "Yönlendiriliyor",
   "type": "TEXT",
-  "defaultValue": "✓ Tasarımınız sepete eklendi. Tasarım No:"
- },
- {
-  "name": "filledText",
-  "displayName": "Alanlar dolduruldu (otomatik ekleme kapalı)",
-  "type": "TEXT",
-  "defaultValue": "✓ Tasarımınız onaylandı, Sepete Ekle ile devam edebilirsiniz. Tasarım No:"
+  "defaultValue": "✓ Sepete eklendi, yönlendiriliyorsunuz…"
  },
  {
   "name": "errorText",
   "displayName": "Hata",
   "type": "TEXT",
-  "defaultValue": "Sepete eklenemedi. Lütfen Sepete Ekle düğmesini kullanın. Tasarım No:"
+  "defaultValue": "Sepete eklenemedi. Lütfen tekrar deneyin."
  },
  {
   "name": "missingOptionText",

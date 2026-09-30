@@ -2,6 +2,8 @@ import {
   IkasProduct,
   IkasProductOption,
   addItemToCart,
+  cartStore,
+  getCheckoutUrlFromCartStore,
   getProductOptionSet,
   getSelectedProductVariant,
   hasValidProductOptionSetValues,
@@ -15,11 +17,14 @@ import {
 import { useEffect, useRef, useState } from "preact/hooks";
 import { Props } from "./types";
 
-// Yıldız Haritası Stüdyosu (tünel) iframe'i. Müşteri tasarımı onaylayınca iframe
-// postMessage({source:"yildiz-haritasi", type:"approved", order}) gönderir; bu bölüm
-// ürünün kişiselleştirme alanlarını doldurur ve (isteğe bağlı) ürünü sepete ekler.
+// Yıldız Haritası Stüdyosu (tünel) iframe'i. Onay ekranındaki düğmeler
+// postMessage({source:"yildiz-haritasi", type:"approved", action, order}) gönderir:
+//   action "add-to-cart" -> alanları doldur, sepete ekle, sepet sayfasına git
+//   action "buy-now"     -> alanları doldur, sepete ekle, doğrudan ödeme sayfasına git
+// Tasarım no müşteriye gösterilmez; ürünün "Tasarım No" kişiselleştirme alanına yazılır.
 
 type Order = { order_id: string; wood_engraving: boolean };
+type Action = "add-to-cart" | "buy-now";
 type Status = { kind: "info" | "ok" | "error"; text: string } | null;
 
 const trLower = (s: string) => s.toLocaleLowerCase("tr");
@@ -73,18 +78,17 @@ export function YildizHaritasiTasarim({
   designOptionName = "Tasarım No",
   woodOptionName = "Ahşap",
   frameHeight = "min(100vh, 900px)",
-  autoAddToCart = true,
+  cartPath = "/cart",
   frameTitle = "Yıldız Haritası Tasarla",
-  addingText = "Tasarımınız onaylandı, sepete ekleniyor…",
-  addedText = "✓ Tasarımınız sepete eklendi. Tasarım No:",
-  filledText = "✓ Tasarımınız onaylandı, Sepete Ekle ile devam edebilirsiniz. Tasarım No:",
-  errorText = "Sepete eklenemedi. Lütfen Sepete Ekle düğmesini kullanın. Tasarım No:",
+  addingText = "Tasarımınız sepete ekleniyor…",
+  redirectingText = "✓ Sepete eklendi, yönlendiriliyorsunuz…",
+  errorText = "Sepete eklenemedi. Lütfen tekrar deneyin.",
   missingOptionText = "Ürünün Tasarım No kişiselleştirme alanı bulunamadı.",
 }: Props) {
   const [status, setStatus] = useState<Status>(null);
   // mesaj dinleyicisi her zaman güncel props'u görsün
-  const latest = useRef({ product, designOptionName, woodOptionName, autoAddToCart });
-  latest.current = { product, designOptionName, woodOptionName, autoAddToCart };
+  const latest = useRef({ product, designOptionName, woodOptionName, cartPath });
+  latest.current = { product, designOptionName, woodOptionName, cartPath };
 
   useEffect(() => {
     if (product) getProductOptionSet(product);
@@ -97,23 +101,19 @@ export function YildizHaritasiTasarim({
       const m = e.data || {};
       if (m.source !== "yildiz-haritasi" || m.type !== "approved" || !m.order) return;
       const order = m.order as Order;
-      const { product: p, designOptionName: dName, woodOptionName: wName, autoAddToCart: auto } = latest.current;
+      const action: Action = m.action === "buy-now" ? "buy-now" : "add-to-cart";
+      const { product: p, designOptionName: dName, woodOptionName: wName, cartPath: cart } = latest.current;
       if (!p) return;
 
       if (!p.productOptionSet) await getProductOptionSet(p);
       const designOpt = findOption(p, dName);
       if (!designOpt) {
-        setStatus({ kind: "error", text: `${missingOptionText} Tasarım No: ${order.order_id}` });
+        setStatus({ kind: "error", text: missingOptionText });
         return;
       }
       setTextValue(designOpt, order.order_id);
       const woodOpt = findOption(p, wName);
       if (woodOpt) setWoodOption(woodOpt, !!order.wood_engraving);
-
-      if (!auto) {
-        setStatus({ kind: "ok", text: `${filledText} ${order.order_id}` });
-        return;
-      }
 
       setStatus({ kind: "info", text: addingText });
       try {
@@ -125,16 +125,16 @@ export function YildizHaritasiTasarim({
         const result = await addItemToCart(getSelectedProductVariant(p), p, 1);
         if (!result.success) throw new Error("cart");
         if (set) initProductOptionSetValues(set);
-        window.dispatchEvent(new CustomEvent("ikas:reset-option-state"));
-        window.dispatchEvent(new CustomEvent("ikas:open-cart-sidebar"));
-        setStatus({ kind: "ok", text: `${addedText} ${order.order_id}` });
+        setStatus({ kind: "ok", text: redirectingText });
+        const checkoutUrl = action === "buy-now" ? getCheckoutUrlFromCartStore(cartStore) : "";
+        window.location.href = checkoutUrl || cart;
       } catch {
-        setStatus({ kind: "error", text: `${errorText} ${order.order_id}` });
+        setStatus({ kind: "error", text: errorText });
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [designerUrl, addingText, addedText, filledText, errorText, missingOptionText]);
+  }, [designerUrl, addingText, redirectingText, errorText, missingOptionText]);
 
   if (!designerUrl || !originOf(designerUrl)) return null;
 

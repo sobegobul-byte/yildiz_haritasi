@@ -64,19 +64,41 @@ tüneli başlatır ve Mac'in uyumasını engeller. **Pencere açık kaldığı s
 Sayfa iframe içinde açılınca **müşteri modu**ndadır: PDF/DXF düğmeleri gizlenir.
 `http://localhost:3000` adresinden kendin açınca imalat düğmeleri görünür.
 
-## 5) Siparişler
+## 5) Siparişler (durum klasörleri)
 
-Her onay `backend/orders/<tasarım-no>/` klasörüne kaydedilir:
+Tasarım klasörü, siparişin durumuna göre `backend/orders/` altında taşınır:
 
-| Dosya | İçerik |
+| Klasör | Ne zaman |
 |---|---|
-| `siparis.json` | konum, tarih, yazılar, ahşap yazısı, ek ücret |
-| `lamba.pdf` | baskı/prova PDF'i |
-| `lamba.dxf` | lazer kesim + gravür (akrilik) |
-| `ahsap-yazi.dxf` | ahşap taban kazıması (seçildiyse) |
-| `onizleme.svg` | müşterinin onayladığı ürün görünümü |
+| `pending/<tasarım-no>/` | Müşteri tasarımı onayladı |
+| `cart/<tasarım-no>/` | Müşteri **Sepete Ekle** veya **Hızlı Satın Al**'a bastı |
+| `completed/<tasarım-no>/` | Satın alındı (sen işaretlersin, aşağıya bak) |
 
-Web sitendeki siparişi, sitenin aldığı **tasarım no** ile bu klasörle eşleştirirsin.
+Her klasörde: `siparis.json` (bilgiler + durum geçmişi), `lamba.pdf`, `lamba.dxf`,
+`ahsap-yazi.dxf` (seçildiyse), `onizleme.svg`.
+
+**Satın alındı olarak işaretleme:** ikas'ta ödenen siparişteki **Tasarım No**'yu al ve
+- klasörü Finder'da `cart/` içinden `completed/` içine sürükle, **ya da**
+- Terminal'de (bu bilgisayarda):
+  ```
+  curl -X POST http://127.0.0.1:8000/api/orders/TASARIM-NO/status -H "Content-Type: application/json" -d '{"status":"completed"}'
+  ```
+Güvenlik: "completed" yalnızca bu bilgisayardan işaretlenebilir; tünel üzerinden gelen istek reddedilir.
+
+## Onay ekranı ve mesajlar
+
+Müşteri onaylayınca tasarım no **gösterilmez**; iki düğme çıkar. Düğmeye basınca üst sayfaya:
+
+```js
+{ source: "yildiz-haritasi", type: "approved",
+  action: "add-to-cart" | "buy-now",
+  order: { order_id, wood_engraving, wood_text, extra_price, location, date, time, lamp_lines, ... } }
+```
+
+- `add-to-cart` → ikas tarafı: Tasarım No'yu yaz, ahşap seçeneğini işaretle, sepete ekle, `/cart`'a git
+- `buy-now` → aynısı + doğrudan ödeme sayfasına git
+
+(`web-sitesi/ikas-script.js` ve `ikas-bilesen/` ikisi de bu iki eylemi karşılar.)
 
 ## 6) İsteğe bağlı güvenlik ayarları
 

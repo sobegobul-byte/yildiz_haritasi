@@ -5,7 +5,9 @@ iframe'i vardır. Müşteri tasarımı onaylayınca:
 
 1. Ürünün **Tasarım No** kişiselleştirme alanına tasarım numarasını yazar,
 2. Ahşap kazıma seçildiyse **Ahşap…** seçeneğini işaretler (onay kutusu veya "Evet/Hayır" listesi),
-3. Ürünü **sepete ekler** ve sepet panelini açar. Bu adım editördeki ayarla kapatılabilir.
+3. Ürünü **sepete ekler**, sonra müşterinin bastığı düğmeye göre:
+   - **Sepete Ekle** → sepet sayfasına (`/cart`, ayarlanabilir)
+   - **Hızlı Satın Al** → doğrudan ikas ödeme sayfasına (`getCheckoutUrlFromCartStore`)
 
 ikas'ın kendi mağaza API'si kullanılır (`setTextValue`, `setCheckboxValue`, `addItemToCart`).
 Sayfa yapısını tahmin eden bir script yöntemi değildir.

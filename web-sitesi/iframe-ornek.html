@@ -31,6 +31,7 @@
       if (m.source !== "yildiz-haritasi" || m.type !== "approved") return;
 
       var o = m.order;
+      // m.action: "add-to-cart" (Sepete Ekle) veya "buy-now" (Hızlı Satın Al)
       // o.order_id      -> tasarım no (dosyalar: backend/orders/<order_id>/)
       // o.location, o.date, o.time, o.lamp_lines, o.wood_text
       // o.extra_price   -> ek ücret (ahşap kazıma seçildiyse 49.90)
@@ -40,7 +41,7 @@
       //    - ya da: window.location.href = "/sepet?tasarim=" + o.order_id;
       var s = document.getElementById("sonuc");
       s.style.display = "block";
-      s.textContent = "Onaylandı! Tasarım no: " + o.order_id +
+      s.textContent = "Eylem: " + m.action + " | Tasarım no: " + o.order_id +
         " | Ek ücret: " + o.extra_price.toFixed(2).replace(".", ",") + " TL";
     });
   </script>

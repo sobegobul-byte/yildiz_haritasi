@@ -2,13 +2,14 @@
 import { useState } from "react";
 import PreviewCanvas from "@/components/PreviewCanvas";
 import {
-  MapConfig, OrderSummary, Personalization, PreviewView, WOOD_ENGRAVING_PRICE, formatTL,
+  CheckoutAction, MapConfig, OrderSummary, Personalization, PreviewView, WOOD_ENGRAVING_PRICE, formatTL,
 } from "@/lib/api";
 
 // 3. adım: müşteri tasarımı büyük önizlemede kontrol edip onaylar.
 // Masaüstünde önizleme solda büyük, özet sağda; mobilde önizleme üstte.
 export default function ReviewPanel({
   svg, loading, error, view, onViewChange, config, pers, approved, order, onBack, onApprove,
+  embedded, onCheckout,
 }: {
   svg: string;
   loading: boolean;
@@ -18,10 +19,19 @@ export default function ReviewPanel({
   config: MapConfig;
   pers: Personalization;
   approved: boolean;
-  order: OrderSummary | null;
+  order: OrderSummary | null;   // müşteriye gösterilmez, sadece ikas'a iletilir
   onBack: () => void;
   onApprove: () => Promise<void>;
+  embedded: boolean;
+  onCheckout: (action: CheckoutAction) => Promise<void>;
 }) {
+  const [sent, setSent] = useState<CheckoutAction | null>(null);
+  const checkout = async (action: CheckoutAction) => {
+    setSent(action);
+    await onCheckout(action);
+    // mağaza sayfası yönlendirmezse (hata vb.) düğmeler tekrar kullanılabilsin
+    setTimeout(() => setSent(null), 8000);
+  };
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -91,16 +101,33 @@ export default function ReviewPanel({
         </div>
 
         {approved ? (
-          <div className="rounded-xl border border-starlight/40 bg-starlight/10 p-4 text-sm space-y-1">
-            <p className="font-medium text-starlight">✓ Tasarımınız onaylandı</p>
-            {order && (
-              <p className="text-cream/80">
-                Tasarım no: <span className="font-mono font-semibold">{order.order_id}</span>
+          <div className="space-y-3">
+            {/* Tasarım no müşteriye gösterilmez; ikas'a arka planda iletilir */}
+            <div className="rounded-xl border border-starlight/40 bg-starlight/10 p-4 text-sm space-y-1">
+              <p className="font-medium text-starlight">✓ Tasarımınız onaylandı</p>
+              <p className="text-cream/60 text-xs">
+                Onaylanan tasarım bu haliyle üretime alınacaktır.
+              </p>
+            </div>
+            <button
+              onClick={() => checkout("add-to-cart")}
+              disabled={!!sent}
+              className="w-full rounded-lg bg-starlight text-night font-semibold py-3 text-sm disabled:opacity-50"
+            >
+              {sent === "add-to-cart" ? "Sepete ekleniyor…" : "Sepete Ekle"}
+            </button>
+            <button
+              onClick={() => checkout("buy-now")}
+              disabled={!!sent}
+              className="w-full rounded-lg border border-starlight text-starlight font-semibold py-3 text-sm disabled:opacity-50"
+            >
+              {sent === "buy-now" ? "Ödeme sayfasına yönlendiriliyor…" : "Hızlı Satın Al"}
+            </button>
+            {sent && !embedded && (
+              <p className="text-[11px] text-cream/40 text-center">
+                (Bu sayfa mağaza içinde açılmadığı için yönlendirme yapılmaz — test modu.)
               </p>
             )}
-            <p className="text-cream/60 text-xs">
-              Onaylanan tasarım bu haliyle üretime alınacaktır.
-            </p>
           </div>
         ) : (
           <>

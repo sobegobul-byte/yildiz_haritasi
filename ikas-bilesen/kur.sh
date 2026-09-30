@@ -9,10 +9,10 @@ C=YildizHaritasiTasarim
 npx ikas-component config add-component --name "$C" --type section --props "$(cat "$HERE/props.json")"
 npx ikas-component config add-prop-group --component $C --id settings --name "Ayarlar"
 npx ikas-component config add-prop-group --component $C --id texts --name "Metinler"
-for p in designerUrl designOptionName woodOptionName frameHeight autoAddToCart; do
+for p in designerUrl designOptionName woodOptionName frameHeight cartPath; do
   npx ikas-component config update-prop --component $C --prop $p --group settings > /dev/null
 done
-for p in frameTitle addingText addedText filledText errorText missingOptionText; do
+for p in frameTitle addingText redirectingText errorText missingOptionText; do
   npx ikas-component config update-prop --component $C --prop $p --group texts > /dev/null
 done
 

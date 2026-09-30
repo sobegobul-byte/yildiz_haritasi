@@ -148,3 +148,14 @@ export async function createOrder(config: MapConfig, personalization: Personaliz
   }
   return r.json();
 }
+
+export type CheckoutAction = "add-to-cart" | "buy-now";
+
+// Tasarım klasörünü orders/pending -> orders/cart taşır (müşteri Sepete Ekle / Hızlı Satın Al'a bastı)
+export async function markOrderInCart(orderId: string, action: CheckoutAction) {
+  await fetch(`/api/orders/${encodeURIComponent(orderId)}/status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "cart", action }),
+  });
+}

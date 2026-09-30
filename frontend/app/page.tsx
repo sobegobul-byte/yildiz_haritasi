@@ -7,7 +7,8 @@ import ExportBar from "@/components/ExportBar";
 import ReviewPanel from "@/components/ReviewPanel";
 import { isEmbedded, notifyParent } from "@/lib/embed";
 import {
-  MapConfig, OrderSummary, Personalization, PreviewView, createOrder, emptyEl, fetchPreview,
+  CheckoutAction, MapConfig, OrderSummary, Personalization, PreviewView,
+  createOrder, emptyEl, fetchPreview, markOrderInCart,
 } from "@/lib/api";
 
 const defaultPersonalization = (): Personalization => ({
@@ -91,11 +92,17 @@ export default function Home() {
           onBack={() => setStage("design")}
           order={order}
           onApprove={async () => {
-            const o = await createOrder(config, pers);
+            const o = await createOrder(config, pers);   // -> orders/pending/<no>
             setOrder(o);
             setStage("approved");
-            // web sitesi bu mesajı dinleyip sipariş/sepet adımına geçer
-            notifyParent("approved", { order: o });
+          }}
+          embedded={embedded}
+          onCheckout={async (action: CheckoutAction) => {
+            if (!order) return;
+            // klasör pending -> cart; ağ hatası olsa da müşteri akışı durmasın
+            await markOrderInCart(order.order_id, action).catch(() => {});
+            // ikas tarafı action'a göre sepete ekler: add-to-cart -> /cart, buy-now -> ödeme
+            notifyParent("approved", { action, order });
           }}
         />
       )}
