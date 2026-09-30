@@ -3,8 +3,8 @@ import { useState } from "react";
 import { MapConfig, Personalization, downloadExport } from "@/lib/api";
 
 export default function ExportBar({
-  config, pers,
-}: { config: MapConfig; pers: Personalization }) {
+  config, pers, blocked,
+}: { config: MapConfig; pers: Personalization; blocked: boolean }) {
   const [busy, setBusy] = useState<"" | "pdf" | "dxf">("");
 
   const run = async (fmt: "pdf" | "dxf") => {
@@ -21,14 +21,14 @@ export default function ExportBar({
       <div className="mx-auto max-w-md md:max-w-5xl flex gap-2">
         <button
           onClick={() => run("pdf")}
-          disabled={!!busy}
+          disabled={!!busy || blocked}
           className="flex-1 rounded-lg bg-starlight text-night font-medium py-3 text-sm disabled:opacity-50"
         >
           {busy === "pdf" ? "Hazırlanıyor…" : "PDF indir (baskı)"}
         </button>
         <button
           onClick={() => run("dxf")}
-          disabled={!!busy}
+          disabled={!!busy || blocked}
           className="flex-1 rounded-lg border border-starlight/60 text-starlight font-medium py-3 text-sm disabled:opacity-50"
         >
           {busy === "dxf" ? "Hazırlanıyor…" : "DXF indir (lazer)"}

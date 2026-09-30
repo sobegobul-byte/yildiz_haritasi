@@ -77,7 +77,8 @@ export async function fetchPreview(
     body: JSON.stringify({ config, personalization, template_id: "yummy-lamp", view }),
   });
   if (!r.ok) throw new Error("Önizleme oluşturulamadı");
-  return r.text(); // SVG string
+  // overflow: yazılar en küçük boyutta bile lamba alanına sığmadı
+  return { svg: await r.text(), overflow: r.headers.get("X-Text-Overflow") === "1" };
 }
 
 export async function downloadExport(

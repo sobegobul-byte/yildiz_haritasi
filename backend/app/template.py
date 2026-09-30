@@ -165,70 +165,144 @@ def _esc(s: str) -> str:
              .replace(">", "&gt;").replace('"', "&quot;"))
 
 
-def resolve_text_positions(tpl: Template, personalization) -> dict:
-    """Her metin alaninin efektif konumu {key: (x, y)}.
-    Lamba sablonunda TUM dolu satirlar (1-4, tarih, koordinat — bu sirayla,
-    koordinat her zaman en altta) kiris ile omuz arasindaki banda dikeyde
-    ortalanarak dagitilir. Banda sigmazsa satir araliklari oransal daralir.
-    Onizleme ve DXF ayni fonksiyonu kullanir."""
-    pos = {k: (s.x, s.y) for k, s in tpl.slots.items()}
-    if tpl.chord_y is None:
-        return pos
+# ---------------------------------------------------------------------------
+# Metin yerlesimi: otomatik satir kaydirma + otomatik yazi boyutu.
+# Yazilar kesim cizgisinin icinde kalir: lamba sablonunda bant, yildiz alaninin
+# alt kirisi ile omuz cubugu arasidir ve genisligi her satirin yuksekligindeki
+# kesim dairesi genisligidir (daire asagi indikce daralir).
+# Onizleme, PDF ve DXF ayni yerlesimi kullanir.
+# ---------------------------------------------------------------------------
+TEXT_FLOW = ("title", "subtitle", "names", "message", "date_text", "coords_text")
+NO_WRAP = {"date_text", "coords_text"}   # bolunmez; sigmazsa kuculur
+MIN_FONT = 13.0          # template birimi; lamba icin ~2.2 mm buyuk harf (lazerde okunur)
+TEXT_MARGIN = 22.0       # kesim cizgisine yatay guvenlik payi (~5.5 mm)
+LINE_H = 1.22            # satir yuksekligi (font boyutunun kati)
+ASCENT, DESCENT = 0.90, 0.24
+FIELD_GAP = 0.18         # alanlar arasi ek bosluk (font boyutunun kati)
+# Olcum Times-Roman metrikleriyle yapilir; Georgia daha genistir -> guvenli pay
+_GEORGIA_FACTOR = 1.15
+_TR_ASCII = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
 
-    flow = [k for k in ("title", "subtitle", "names", "message",
-                        "date_text", "coords_text") if k in tpl.slots]
-    items = []
-    for k in flow:
-        el = getattr(personalization, k)
-        if not el.visible or not el.content.strip():
-            continue
-        n_lines = len(el.content.split("\n"))
-        items.append((k, el.font_size, el.font_size * 1.35 * n_lines))
-    if not items:
-        return pos
 
-    top = tpl.chord_y + 8
-    bottom = LAMP_MM["bar_top"] * _K - 6 if tpl.shape == "lamp" else tpl.height - 8
+@dataclass
+class TextLine:
+    key: str
+    text: str
+    x: float             # yatay merkez
+    y: float             # taban cizgisi
+    font_size: float
+    letter_spacing: float
+
+
+def text_width(s: str, font_size: float, letter_spacing: float = 0.0) -> float:
+    """Satirin tahmini genisligi (template birimi), Georgia icin guvenli tarafta."""
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    w = stringWidth(s.translate(_TR_ASCII), "Times-Roman", font_size) * _GEORGIA_FACTOR
+    return w + letter_spacing * max(0, len(s) - 1)
+
+
+def _text_band(tpl: Template) -> tuple[float, float]:
+    if tpl.chord_y is not None:
+        top = tpl.chord_y + 8
+        bottom = (LAMP_MM["bar_top"] * _K - 6) if tpl.shape == "lamp" else tpl.height - 8
+    else:
+        top = tpl.circle_cy + tpl.circle_r + 40
+        bottom = tpl.height - 30
+    return top, bottom
+
+
+def available_width(tpl: Template, y_top: float, y_bot: float) -> float:
+    """y_top..y_bot yuksekligindeki bir satirin kullanabilecegi genislik."""
+    if tpl.shape != "lamp":
+        return tpl.width - 2 * TEXT_MARGIN
+    R, cy = LAMP_MM["outer_r"] * _K, LAMP_MM["outer_cy"] * _K
+    d = max(abs(y_top - cy), abs(y_bot - cy))
+    if d >= R:
+        return 0.0
+    return 2 * math.sqrt(R * R - d * d) - 2 * TEXT_MARGIN
+
+
+def _line_fits(tpl: Template, ln: "TextLine") -> bool:
+    top = ln.y - ASCENT * ln.font_size
+    bot = ln.y + DESCENT * ln.font_size
+    return text_width(ln.text, ln.font_size, ln.letter_spacing) <= available_width(tpl, top, bot)
+
+
+def _flow(tpl: Template, fields, scale: float, y0: float) -> tuple[list, float]:
+    """Alanlari y0'dan baslayarak yukaridan asagi dizer, kelime kelime kaydirir."""
+    cx = tpl.width / 2
+    lines: list[TextLine] = []
+    y = y0
+    for i, (key, el) in enumerate(fields):
+        fs = max(MIN_FONT, el.font_size * scale)
+        ls = el.letter_spacing * scale
+        if i > 0:
+            y += fs * FIELD_GAP
+        for para in el.content.split("\n"):
+            words = [para.strip()] if key in NO_WRAP else para.split()
+            cur = ""
+            for w in words:
+                cand = f"{cur} {w}" if cur else w
+                width = available_width(tpl, y, y + (ASCENT + DESCENT) * fs)
+                if not cur or text_width(cand, fs, ls) <= width:
+                    cur = cand
+                else:
+                    lines.append(TextLine(key, cur, cx, y + ASCENT * fs, fs, ls))
+                    y += fs * LINE_H
+                    cur = w
+            if cur:
+                lines.append(TextLine(key, cur, cx, y + ASCENT * fs, fs, ls))
+                y += fs * LINE_H
+    return lines, y - y0
+
+
+def layout_text(tpl: Template, personalization) -> tuple[list, bool]:
+    """Kisisellestirme yazilarinin nihai yerlesimi.
+    Once satirlar kaydirilir; sigmazsa tum yazilar birlikte orantili kuculur
+    (en az MIN_FONT). Bant icinde dikeyde ortalanir. Ikinci deger True ise
+    en kucuk boyutta bile sigmadi (musteri yaziyi kisaltmali)."""
+    fields = [(k, getattr(personalization, k)) for k in TEXT_FLOW
+              if hasattr(personalization, k)]
+    fields = [(k, el) for k, el in fields if el.visible and el.content.strip()]
+    if not fields:
+        return [], False
+
+    top, bottom = _text_band(tpl)
     band = bottom - top
-
-    total = sum(h for _, _, h in items)
-    squeeze = min(1.0, band / total) if total > 0 else 1.0   # sigmazsa daralt
-    y = top + max(0.0, (band - total * squeeze) / 2.0)
-    for k, fs, h in items:
-        pos[k] = (tpl.slots[k].x, y + fs)   # ilk satirin taban cizgisi
-        y += h * squeeze
-    return pos
+    lines: list[TextLine] = []
+    scale = 1.0
+    while True:
+        # En genis yer bandin tepesi: satirlar orada kaydirilir, sonra dikeyde
+        # ortalanir. Ortalanmis hali (asagisi daha dar) tasiyorsa ust hizali kalir.
+        lines, h = _flow(tpl, fields, scale, top)
+        if h <= band + 0.5:
+            shift = (band - h) / 2
+            moved = [TextLine(l.key, l.text, l.x, l.y + shift, l.font_size, l.letter_spacing)
+                     for l in lines]
+            if all(_line_fits(tpl, l) for l in moved):
+                return moved, False
+            if all(_line_fits(tpl, l) for l in lines):
+                return lines, False
+        if all(max(MIN_FONT, el.font_size * scale) <= MIN_FONT for _, el in fields):
+            # en kucuk boyutta da sigmadi: tasan satirlar cizime HIC konmaz
+            # (kesim cizgisi asilmaz); musteri uyarilir, export engellenir
+            kept = [l for l in lines
+                    if l.y + DESCENT * l.font_size <= bottom and _line_fits(tpl, l)]
+            return kept, True
+        scale *= 0.96
 
 
 def render_text_layer(tpl: Template, personalization) -> str:
-    """Kisisellestirme metinlerini slotlara yerlestirir."""
+    """Kisisellestirme metinleri (SVG): otomatik yerlesimden, ortalanmis."""
+    lines, _ = layout_text(tpl, personalization)
     parts = []
-    positions = resolve_text_positions(tpl, personalization)
-    for key, (sx, sy) in positions.items():
-        el = getattr(personalization, key)
-        if not el.visible or not el.content.strip():
-            continue
-        x = sx + el.dx
-        y = sy + el.dy
-        ls = f' letter-spacing="{el.letter_spacing}"' if el.letter_spacing else ""
-        # cok satirli mesaj destegi
-        lines = el.content.split("\n")
-        if len(lines) == 1:
-            parts.append(
-                f'<text x="{x}" y="{y}" text-anchor="{el.align}" '
-                f'font-size="{el.font_size}" fill="{tpl.fg_color}" '
-                f'font-family="Georgia, \'Times New Roman\', serif"{ls}>{_esc(el.content)}</text>'
-            )
-        else:
-            tspans = "".join(
-                f'<tspan x="{x}" dy="{0 if i == 0 else el.font_size * 1.35}">{_esc(ln)}</tspan>'
-                for i, ln in enumerate(lines)
-            )
-            parts.append(
-                f'<text x="{x}" y="{y}" text-anchor="{el.align}" '
-                f'font-size="{el.font_size}" fill="{tpl.fg_color}" '
-                f'font-family="Georgia, \'Times New Roman\', serif"{ls}>{tspans}</text>'
-            )
+    for ln in lines:
+        ls = f' letter-spacing="{ln.letter_spacing:.2f}"' if ln.letter_spacing else ""
+        parts.append(
+            f'<text x="{ln.x:.2f}" y="{ln.y:.2f}" text-anchor="middle" '
+            f'font-size="{ln.font_size:.2f}" fill="{tpl.fg_color}" '
+            f'font-family="Georgia, \'Times New Roman\', serif"{ls}>{_esc(ln.text)}</text>'
+        )
     return "\n".join(parts)
 
 

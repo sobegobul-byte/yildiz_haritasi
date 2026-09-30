@@ -13,7 +13,7 @@ import os
 
 import ezdxf
 
-from .template import (Template, lamp_cut_entities_mm, resolve_text_positions)
+from .template import (Template, lamp_cut_entities_mm, layout_text)
 from .starmap import get_sky_data, mag_to_radius
 
 MM2PT = 72.0 / 25.4
@@ -34,7 +34,11 @@ def _pdf_font() -> str:
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
     for name, path in (("Georgia", r"C:\Windows\Fonts\georgia.ttf"),
+                       ("Georgia", "/System/Library/Fonts/Supplemental/Georgia.ttf"),   # macOS
+                       ("Georgia", "/Library/Fonts/Georgia.ttf"),
                        ("TimesNewRoman", r"C:\Windows\Fonts\times.ttf"),
+                       ("TimesNewRoman", "/System/Library/Fonts/Supplemental/Times New Roman.ttf"),
+                       ("DejaVuSerif", "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf"),
                        ("Arial", r"C:\Windows\Fonts\arial.ttf")):
         if os.path.exists(path):
             try:
@@ -156,30 +160,19 @@ def build_pdf(tpl: Template, config, personalization) -> bytes:
     c.setLineWidth(1.6 * u2pt if tpl.chord_y is not None else 2.0 * u2pt)
     c.drawPath(_star_area_path_pdf(c, tpl, u2pt), stroke=1, fill=0)
 
-    # 5) metinler (onizlemeyle ayni konum fonksiyonu)
+    # 5) metinler (onizlemeyle ayni otomatik yerlesim: satirlar + boyutlar)
     font = _pdf_font()
     c.setFillColor(fg)
-    for key, (sx0, sy0) in resolve_text_positions(tpl, personalization).items():
-        el = getattr(personalization, key)
-        if not el.visible or not el.content.strip():
-            continue
-        fs = el.font_size * u2pt
-        cs = el.letter_spacing * u2pt
-        for i, line in enumerate(el.content.split("\n")):
-            if not line.strip():
-                continue
-            bx = X(sx0 + el.dx)
-            by = Y(sy0 + el.dy + i * el.font_size * 1.35)
-            w = stringWidth(line, font, fs) + cs * max(0, len(line) - 1)
-            if el.align == "middle":
-                bx -= w / 2.0
-            elif el.align == "end":
-                bx -= w
-            t = c.beginText(bx, by)
-            t.setFont(font, fs)
-            t.setCharSpace(cs)   # 0 dahil her zaman yaz: Tc PDF'te bloklar arasi kalicidir
-            t.textOut(line)
-            c.drawText(t)
+    lines, _ = layout_text(tpl, personalization)
+    for ln in lines:
+        fs = ln.font_size * u2pt
+        cs = ln.letter_spacing * u2pt
+        w = stringWidth(ln.text, font, fs) + cs * max(0, len(ln.text) - 1)
+        t = c.beginText(X(ln.x) - w / 2.0, Y(ln.y))
+        t.setFont(font, fs)
+        t.setCharSpace(cs)   # 0 dahil her zaman yaz: Tc PDF'te bloklar arasi kalicidir
+        t.textOut(ln.text)
+        c.drawText(t)
 
     c.showPage()
     c.save()
@@ -280,25 +273,17 @@ def build_dxf(tpl: Template, config, personalization) -> bytes:
             if len(seg) >= 2:
                 msp.add_lwpolyline(seg, dxfattribs={"layer": "CONSTELLATIONS"})
 
-    # TEXT: kisisellestirme yazilari (konumlar onizlemeyle ayni fonksiyondan)
-    positions = resolve_text_positions(tpl, personalization)
-    for key, (sx0, sy0) in positions.items():
-        el = getattr(personalization, key)
-        if not el.visible or not el.content.strip():
-            continue
-        h_mm = round(el.font_size * sy * 0.72, 3)   # SVG font-size -> yaklasik buyuk harf yuksekligi
-        align_map = {"start": 0, "middle": 1, "end": 2}  # ezdxf halign: LEFT/CENTER/RIGHT
-        x_mm = tx(sx0 + el.dx)
-        y_mm = ty(sy0 + el.dy)
-        for i, line in enumerate(el.content.split("\n")):
-            t = msp.add_text(line, dxfattribs={
-                "layer": "TEXT", "height": h_mm, "style": "Standard",
-            })
-            t.set_placement((x_mm, round(y_mm - i * h_mm * 1.5, 3)),
-                            align=ezdxf.enums.TextEntityAlignment(
-                                {0: ezdxf.enums.TextEntityAlignment.LEFT,
-                                 1: ezdxf.enums.TextEntityAlignment.CENTER,
-                                 2: ezdxf.enums.TextEntityAlignment.RIGHT}[align_map[el.align]].value))
+    # TEXT: kisisellestirme yazilari (onizlemeyle ayni otomatik yerlesim).
+    # Georgia TTF stili: lazer/CAD programi Georgia ile acarsa genislikler onizlemeyle uyusur.
+    doc.styles.new("Georgia", dxfattribs={"font": "georgia.ttf"})
+    lines, _ = layout_text(tpl, personalization)
+    for ln in lines:
+        t = msp.add_text(ln.text, dxfattribs={
+            "layer": "TEXT",
+            "height": round(ln.font_size * sy * 0.69, 3),   # Georgia buyuk harf yuksekligi
+            "style": "Georgia",
+        })
+        t.set_placement((tx(ln.x), ty(ln.y)), align=ezdxf.enums.TextEntityAlignment.CENTER)
 
     buf = io.StringIO()
     doc.write(buf)

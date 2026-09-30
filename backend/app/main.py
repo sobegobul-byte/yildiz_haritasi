@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from .models import LocationQuery, PreviewRequest, ExportRequest
-from .template import TEMPLATES, compose_svg, compose_mockup_svg
+from .template import TEMPLATES, compose_svg, compose_mockup_svg, layout_text
 from .starmap import render_star_layer
 from .exporters import build_pdf, build_dxf
 from .geocode import geocode, format_coords
@@ -60,13 +60,24 @@ def _compose(req: PreviewRequest, view: str = "flat") -> str:
 @app.post("/api/preview")
 def api_preview(req: PreviewRequest):
     svg = _compose(req, req.view)
-    return Response(content=svg, media_type="image/svg+xml")
+    # yazi en kucuk boyutta bile sigmiyorsa on yuz musteriyi uyarir
+    _, overflow = layout_text(TEMPLATES[req.template_id], req.personalization)
+    return Response(content=svg, media_type="image/svg+xml",
+                    headers={"X-Text-Overflow": "1" if overflow else "0"})
+
+
+def _reject_overflow(req: ExportRequest):
+    """Yazilar en kucuk boyutta bile sigmiyorsa uretim dosyasi verilmez.
+    _compose'dan SONRA cagrilir (otomatik tarih/koordinat satirlari dahil olsun)."""
+    if layout_text(TEMPLATES[req.template_id], req.personalization)[1]:
+        raise HTTPException(status_code=422, detail="Yazılar lamba alanına sığmıyor")
 
 
 @app.post("/api/export/pdf")
 def api_export_pdf(req: ExportRequest):
     tpl = TEMPLATES[req.template_id]
     _compose(req)  # bos koordinat/tarih alanlarini otomatik doldurur
+    _reject_overflow(req)
     pdf = build_pdf(tpl, req.config, req.personalization)
     return Response(content=pdf, media_type="application/pdf",
                     headers={"Content-Disposition": 'attachment; filename="starmap.pdf"'})
@@ -76,6 +87,7 @@ def api_export_pdf(req: ExportRequest):
 def api_export_dxf(req: ExportRequest):
     tpl = TEMPLATES[req.template_id]
     _compose(req)  # otomatik alan doldurma yan etkisi icin
+    _reject_overflow(req)
     dxf = build_dxf(tpl, req.config, req.personalization)
     return Response(content=dxf, media_type="application/dxf",
                     headers={"Content-Disposition": 'attachment; filename="starmap.dxf"'})

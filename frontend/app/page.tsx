@@ -22,6 +22,7 @@ export default function Home() {
   const [pers, setPers] = useState<Personalization>(defaultPersonalization());
   const [svg, setSvg] = useState<string>("");
   const [view, setView] = useState<PreviewView>("mockup");
+  const [overflow, setOverflow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const debounce = useRef<ReturnType<typeof setTimeout>>();
@@ -32,7 +33,9 @@ export default function Home() {
       try {
         setLoading(true);
         setError("");
-        setSvg(await fetchPreview(cfg, p, v));
+        const res = await fetchPreview(cfg, p, v);
+        setSvg(res.svg);
+        setOverflow(res.overflow);
       } catch (e: any) {
         setError(e.message || "Bir sorun oluştu");
       } finally {
@@ -66,11 +69,11 @@ export default function Home() {
             Harita oluşunca 1. adım tek satıra kapanır, yazarken kaydırma gerekmez. */}
         <section className="space-y-4 md:order-1">
           <LocationForm onResolved={setConfig} />
-          {config && <TextEditor pers={pers} onChange={setPers} />}
+          {config && <TextEditor pers={pers} onChange={setPers} overflow={overflow} />}
         </section>
       </div>
 
-      {config && <ExportBar config={config} pers={pers} />}
+      {config && <ExportBar config={config} pers={pers} blocked={overflow} />}
     </main>
   );
 }
