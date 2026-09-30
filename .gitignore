@@ -1,0 +1,21 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+env/
+
+# Ortam değişkenleri / gizli bilgiler
+.env
+.env.*
+
+# macOS
+.DS_Store
+__MACOSX/

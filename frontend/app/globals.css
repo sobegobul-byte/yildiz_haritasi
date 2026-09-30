@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: #0b1026;
+  -webkit-font-smoothing: antialiased;
+}
+.font-serif { font-family: Georgia, "Times New Roman", serif; }
