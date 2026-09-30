@@ -15,6 +15,8 @@ const defaultPersonalization = (): Personalization => ({
   coords_text: emptyEl({ content: "", font_size: 21, letter_spacing: 2 }),
   date_text: emptyEl({ content: "", font_size: 18, letter_spacing: 2 }),
   message: emptyEl({ content: "", font_size: 16 }),
+  wood_engraving: false,
+  wood_text: "",
 });
 
 export default function Home() {
@@ -23,6 +25,7 @@ export default function Home() {
   const [svg, setSvg] = useState<string>("");
   const [view, setView] = useState<PreviewView>("mockup");
   const [overflow, setOverflow] = useState(false);
+  const [woodOverflow, setWoodOverflow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const debounce = useRef<ReturnType<typeof setTimeout>>();
@@ -36,6 +39,7 @@ export default function Home() {
         const res = await fetchPreview(cfg, p, v);
         setSvg(res.svg);
         setOverflow(res.overflow);
+        setWoodOverflow(res.woodOverflow);
       } catch (e: any) {
         setError(e.message || "Bir sorun oluştu");
       } finally {
@@ -69,11 +73,11 @@ export default function Home() {
             Harita oluşunca 1. adım tek satıra kapanır, yazarken kaydırma gerekmez. */}
         <section className="space-y-4 md:order-1">
           <LocationForm onResolved={setConfig} />
-          {config && <TextEditor pers={pers} onChange={setPers} overflow={overflow} />}
+          {config && <TextEditor pers={pers} onChange={setPers} overflow={overflow} woodOverflow={woodOverflow} />}
         </section>
       </div>
 
-      {config && <ExportBar config={config} pers={pers} blocked={overflow} />}
+      {config && <ExportBar config={config} pers={pers} blocked={overflow} woodBlocked={woodOverflow} />}
     </main>
   );
 }

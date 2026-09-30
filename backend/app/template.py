@@ -361,6 +361,62 @@ def compose_svg(tpl: Template, star_layer_svg: str, personalization) -> str:
 </svg>'''
 
 
+# ---------------------------------------------------------------------------
+# Ahsap taban yazi kazima (ek hizmet): on yuzde 65 x 13 mm alan (taban 16 mm).
+# Kisa yazi tek satir; uzun yazi dengeli 2 satira bolunur, boyut otomatik.
+# ---------------------------------------------------------------------------
+WOOD_MM = {"w": 65.0, "h": 13.0, "base_h": 16.0}
+WOOD_FONT_MAX_1 = 8.0      # tek satir en buyuk font (mm) ~5.5 mm buyuk harf
+WOOD_FONT_MAX_2 = 5.4      # iki satirda en buyuk font (mm): 2 satir 13 mm'ye sigar
+WOOD_FONT_MIN = 3.0        # bunun altinda kazima okunmaz -> tasma
+WOOD_ONE_LINE_MIN = 4.5    # tek satir bundan kucuk kalacaksa 2 satira bolunur
+WOOD_LINE_H = 1.2
+_CAP_MID = 0.35            # satirin gorsel ortasi: taban cizgisinin ~0.35 font ustu
+
+
+def layout_wood_text(text: str) -> tuple[list, float, bool]:
+    """Ahsap yazisi: ([(satir, alan merkezine gore taban cizgisi dy_mm)], font_mm, tasma)."""
+    text = " ".join(text.split())
+    if not text:
+        return [], 0.0, False
+    W = WOOD_MM["w"]
+
+    def fit(lines: list[str], fmax: float) -> float:
+        widest = max(text_width(ln, 1.0) for ln in lines)   # 1 mm font genisligi
+        return min(fmax, W / widest) if widest > 0 else fmax
+
+    lines, fs = [text], fit([text], WOOD_FONT_MAX_1)
+    words = text.split()
+    if fs < WOOD_ONE_LINE_MIN and len(words) > 1:
+        # en dengeli bolme noktasi (uzun satirin en kisa oldugu)
+        best = min(range(1, len(words)),
+                   key=lambda i: max(text_width(" ".join(words[:i]), 1.0),
+                                     text_width(" ".join(words[i:]), 1.0)))
+        two = [" ".join(words[:best]), " ".join(words[best:])]
+        fs2 = fit(two, WOOD_FONT_MAX_2)
+        if fs2 > fs:
+            lines, fs = two, fs2
+    n = len(lines)
+    placed = [(ln, _CAP_MID * fs + (i - (n - 1) / 2) * WOOD_LINE_H * fs)
+              for i, ln in enumerate(lines)]
+    return placed, fs, fs < WOOD_FONT_MIN
+
+
+def _wood_text_svg(personalization, cx: float, cy: float, k: float) -> str:
+    """Urun gorunumu: tabanin on yuzunde kazinmis yazi (koyu oyuk + alt kenarda isik)."""
+    if not getattr(personalization, "wood_engraving", False):
+        return ""
+    placed, fs, _ = layout_wood_text(personalization.wood_text)
+    out = []
+    for ln, dy in placed:
+        y = cy + dy * k
+        common = (f'x="{cx:.2f}" text-anchor="middle" font-size="{fs * k:.2f}" '
+                  f'font-family="Georgia, \'Times New Roman\', serif"')
+        out.append(f'<text {common} y="{y + 0.7:.2f}" fill="#f6d7a8" opacity="0.35">{_esc(ln)}</text>'
+                   f'<text {common} y="{y:.2f}" fill="#4a2810" opacity="0.88">{_esc(ln)}</text>')
+    return "<!-- ahsap yazi kazima -->" + "".join(out)
+
+
 def compose_mockup_svg(tpl: Template, star_layer_svg: str, personalization) -> str:
     """Musteriye gosterilen isikli urun gorunumu (sadece onizleme).
     Ayni kesim/yildiz/metin geometrisi kullanilir; yalnizca gorunum farklidir:
@@ -379,7 +435,7 @@ def compose_mockup_svg(tpl: Template, star_layer_svg: str, personalization) -> s
     base_w = base_r - base_l
     end_rx, top_ry = 92, 26                      # uc yarim dairelerin perspektif yaricaplari
     top_y = slot_y - top_ry                      # ust yuzey ust kenari
-    side_h = 62                                  # taban yan yuzu kalinligi
+    side_h = WOOD_MM["base_h"] * k               # taban yan yuzu: gercek 1.6 cm
     front_b = slot_y + side_h + top_ry           # taban alt kenari (en on nokta)
     slot_l, slot_r = LAMP_MM["tab_l"] * k - 16, LAMP_MM["tab_r"] * k + 16
     top_face = (f"M {base_l + end_rx},{top_y} H {base_r - end_rx} "
@@ -475,6 +531,8 @@ def compose_mockup_svg(tpl: Template, star_layer_svg: str, personalization) -> s
   <path d="{top_face}" fill="none" stroke="#f3d3a6" stroke-width="1" opacity="0.5"/>
   <rect x="{slot_l}" y="{slot_y - 5}" width="{slot_r - slot_l}" height="10" rx="5" fill="#2b170a"/>
   <ellipse cx="{cx}" cy="{slot_y}" rx="{base_w * 0.38}" ry="{top_ry * 1.1}" fill="url(#mSlotGlow)"/>
+
+  {_wood_text_svg(personalization, cx, slot_y + top_ry + side_h / 2, k)}
 
   <!-- akrilik plaka: tabana giren tirnak gizlenir -->
   <g clip-path="url(#mAboveSlot)">

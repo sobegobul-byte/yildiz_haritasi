@@ -6,9 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from .models import LocationQuery, PreviewRequest, ExportRequest
-from .template import TEMPLATES, compose_svg, compose_mockup_svg, layout_text
+from .template import (TEMPLATES, compose_svg, compose_mockup_svg, layout_text,
+                       layout_wood_text)
 from .starmap import render_star_layer
-from .exporters import build_pdf, build_dxf
+from .exporters import build_pdf, build_dxf, build_wood_dxf
 from .geocode import geocode, format_coords
 
 app = FastAPI(title="Starmap Studio API", version="0.1.0")
@@ -62,8 +63,11 @@ def api_preview(req: PreviewRequest):
     svg = _compose(req, req.view)
     # yazi en kucuk boyutta bile sigmiyorsa on yuz musteriyi uyarir
     _, overflow = layout_text(TEMPLATES[req.template_id], req.personalization)
+    p = req.personalization
+    wood_overflow = p.wood_engraving and layout_wood_text(p.wood_text)[2]
     return Response(content=svg, media_type="image/svg+xml",
-                    headers={"X-Text-Overflow": "1" if overflow else "0"})
+                    headers={"X-Text-Overflow": "1" if overflow else "0",
+                             "X-Wood-Overflow": "1" if wood_overflow else "0"})
 
 
 def _reject_overflow(req: ExportRequest):
@@ -91,3 +95,14 @@ def api_export_dxf(req: ExportRequest):
     dxf = build_dxf(tpl, req.config, req.personalization)
     return Response(content=dxf, media_type="application/dxf",
                     headers={"Content-Disposition": 'attachment; filename="starmap.dxf"'})
+
+
+@app.post("/api/export/wood-dxf")
+def api_export_wood_dxf(req: ExportRequest):
+    p = req.personalization
+    if not p.wood_engraving or not p.wood_text.strip():
+        raise HTTPException(status_code=400, detail="Ahşap yazı kazıma seçilmedi")
+    if layout_wood_text(p.wood_text)[2]:
+        raise HTTPException(status_code=422, detail="Ahşap yazısı alana sığmıyor")
+    return Response(content=build_wood_dxf(p), media_type="application/dxf",
+                    headers={"Content-Disposition": 'attachment; filename="ahsap-yazi.dxf"'})

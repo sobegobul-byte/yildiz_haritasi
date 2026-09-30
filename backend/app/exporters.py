@@ -13,7 +13,8 @@ import os
 
 import ezdxf
 
-from .template import (Template, lamp_cut_entities_mm, layout_text)
+from .template import (Template, lamp_cut_entities_mm, layout_text,
+                       layout_wood_text, WOOD_MM)
 from .starmap import get_sky_data, mag_to_radius
 
 MM2PT = 72.0 / 25.4
@@ -285,6 +286,30 @@ def build_dxf(tpl: Template, config, personalization) -> bytes:
         })
         t.set_placement((tx(ln.x), ty(ln.y)), align=ezdxf.enums.TextEntityAlignment.CENTER)
 
+    buf = io.StringIO()
+    doc.write(buf)
+    return buf.getvalue().encode("utf-8")
+
+
+def build_wood_dxf(personalization) -> bytes:
+    """Ahsap taban on yuzu yazi kazima dosyasi (mm): GUIDE = 65 x 13 mm kazima alani,
+    TEXT = yazi (alan merkezine ortali, 1 veya 2 satir)."""
+    W, H = WOOD_MM["w"], WOOD_MM["h"]
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    doc.header["$MEASUREMENT"] = 1
+    msp = doc.modelspace()
+    doc.layers.add("TEXT", color=1)
+    doc.layers.add("GUIDE", color=5)
+    doc.styles.new("Georgia", dxfattribs={"font": "georgia.ttf"})
+    msp.add_lwpolyline([(0, 0), (W, 0), (W, H), (0, H)], close=True,
+                       dxfattribs={"layer": "GUIDE"})
+    placed, fs, _ = layout_wood_text(personalization.wood_text)
+    for line, dy in placed:
+        t = msp.add_text(line, dxfattribs={"layer": "TEXT", "style": "Georgia",
+                                           "height": round(fs * 0.69, 3)})
+        t.set_placement((W / 2, round(H / 2 - dy, 3)),     # DXF'te y yukari
+                        align=ezdxf.enums.TextEntityAlignment.CENTER)
     buf = io.StringIO()
     doc.write(buf)
     return buf.getvalue().encode("utf-8")

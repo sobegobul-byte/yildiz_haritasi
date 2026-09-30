@@ -30,7 +30,14 @@ export interface Personalization {
   coords_text: TextElement;
   date_text: TextElement;
   message: TextElement;
+  // ek hizmet: ahşap tabana yazı kazıma
+  wood_engraving: boolean;
+  wood_text: string;
 }
+
+export const WOOD_ENGRAVING_PRICE = 49.9;
+export const formatTL = (n: number) =>
+  n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
 
 export interface ResolvedLocation {
   lat: number;
@@ -78,25 +85,39 @@ export async function fetchPreview(
   });
   if (!r.ok) throw new Error("Önizleme oluşturulamadı");
   // overflow: yazılar en küçük boyutta bile lamba alanına sığmadı
-  return { svg: await r.text(), overflow: r.headers.get("X-Text-Overflow") === "1" };
+  return {
+    svg: await r.text(),
+    overflow: r.headers.get("X-Text-Overflow") === "1",
+    woodOverflow: r.headers.get("X-Wood-Overflow") === "1",
+  };
 }
 
+export type ExportFormat = "pdf" | "dxf" | "wood-dxf";
+const EXPORT_FILENAME: Record<ExportFormat, string> = {
+  pdf: "yildiz-haritasi.pdf",
+  dxf: "yildiz-haritasi.dxf",
+  "wood-dxf": "ahsap-yazi.dxf",
+};
+
 export async function downloadExport(
-  format: "pdf" | "dxf",
+  format: ExportFormat,
   config: MapConfig,
   personalization: Personalization
 ) {
   const r = await fetch(`/api/export/${format}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ config, personalization, template_id: "yummy-lamp", format }),
+    body: JSON.stringify({
+      config, personalization, template_id: "yummy-lamp",
+      format: format === "pdf" ? "pdf" : "dxf",
+    }),
   });
   if (!r.ok) throw new Error("Export başarısız");
   const blob = await r.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `yildiz-haritasi.${format}`;
+  a.download = EXPORT_FILENAME[format];
   a.click();
   URL.revokeObjectURL(url);
 }

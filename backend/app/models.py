@@ -45,6 +45,9 @@ class Personalization(BaseModel):
     coords_text: TextElement = TextElement(content="", font_size=21, letter_spacing=2)
     date_text: TextElement = TextElement(content="", font_size=18, letter_spacing=2)
     message: TextElement = TextElement(content="", font_size=16)
+    # ek hizmet: ahsap tabanin on yuzune yazi kazima (+49,90 TL)
+    wood_engraving: bool = False
+    wood_text: str = ""
 
 
 class PreviewRequest(BaseModel):

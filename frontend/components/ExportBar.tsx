@@ -1,13 +1,14 @@
 "use client";
 import { useState } from "react";
-import { MapConfig, Personalization, downloadExport } from "@/lib/api";
+import { ExportFormat, MapConfig, Personalization, downloadExport } from "@/lib/api";
 
 export default function ExportBar({
-  config, pers, blocked,
-}: { config: MapConfig; pers: Personalization; blocked: boolean }) {
-  const [busy, setBusy] = useState<"" | "pdf" | "dxf">("");
+  config, pers, blocked, woodBlocked,
+}: { config: MapConfig; pers: Personalization; blocked: boolean; woodBlocked: boolean }) {
+  const [busy, setBusy] = useState<"" | ExportFormat>("");
+  const wood = pers.wood_engraving && pers.wood_text.trim() !== "";
 
-  const run = async (fmt: "pdf" | "dxf") => {
+  const run = async (fmt: ExportFormat) => {
     setBusy(fmt);
     try {
       await downloadExport(fmt, config, pers);
@@ -33,6 +34,15 @@ export default function ExportBar({
         >
           {busy === "dxf" ? "Hazırlanıyor…" : "DXF indir (lazer)"}
         </button>
+        {wood && (
+          <button
+            onClick={() => run("wood-dxf")}
+            disabled={!!busy || woodBlocked}
+            className="flex-1 rounded-lg border border-starlight/60 text-starlight font-medium py-3 text-sm disabled:opacity-50"
+          >
+            {busy === "wood-dxf" ? "Hazırlanıyor…" : "Ahşap DXF"}
+          </button>
+        )}
       </div>
     </div>
   );
