@@ -299,11 +299,22 @@ def compose_mockup_svg(tpl: Template, star_layer_svg: str, personalization) -> s
 
     cx = tpl.width / 2
     slot_y = LAMP_MM["bar_bot"] * k + 4          # akrilik tabana bu cizgide girer
+    # kayin ahsap LED taban: yuvarlak uclu oval (stadyum), ustte akrilik yarigi.
+    # Hafif yukaridan bakis: ust yuzey basik, uclar eliptik gorunur.
     base_l, base_r = 8 * k, (LAMP_MM["W"] - 8) * k
     base_w = base_r - base_l
-    top_h = 44                                   # taban ust yuzeyi (perspektif)
-    top_y = slot_y - top_h / 2
-    front_b = slot_y + 96                        # taban on yuzu alt kenari
+    end_rx, top_ry = 92, 26                      # uc yarim dairelerin perspektif yaricaplari
+    top_y = slot_y - top_ry                      # ust yuzey ust kenari
+    side_h = 62                                  # taban yan yuzu kalinligi
+    front_b = slot_y + side_h + top_ry           # taban alt kenari (en on nokta)
+    slot_l, slot_r = LAMP_MM["tab_l"] * k - 16, LAMP_MM["tab_r"] * k + 16
+    top_face = (f"M {base_l + end_rx},{top_y} H {base_r - end_rx} "
+                f"A {end_rx} {top_ry} 0 0 1 {base_r - end_rx},{slot_y + top_ry} "
+                f"H {base_l + end_rx} A {end_rx} {top_ry} 0 0 1 {base_l + end_rx},{top_y} Z")
+    side_face = (f"M {base_l},{slot_y} V {slot_y + side_h} "
+                 f"A {end_rx} {top_ry} 0 0 0 {base_l + end_rx},{front_b} "
+                 f"H {base_r - end_rx} A {end_rx} {top_ry} 0 0 0 {base_r},{slot_y + side_h} "
+                 f"V {slot_y} Z")
 
     # tuval: urunun cevresinde ortam icin bosluk
     vx, vy = -60, -50
@@ -333,19 +344,20 @@ def compose_mockup_svg(tpl: Template, star_layer_svg: str, personalization) -> s
       <stop offset="1" stop-color="#ffc47a" stop-opacity="0.22"/>
     </linearGradient>
     <linearGradient id="mWoodFront" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#5a3517"/>
-      <stop offset="0.3" stop-color="#9a6531"/>
-      <stop offset="0.55" stop-color="#b47a3f"/>
-      <stop offset="1" stop-color="#5e3818"/>
+      <stop offset="0" stop-color="#8f5f34"/>
+      <stop offset="0.3" stop-color="#c38d56"/>
+      <stop offset="0.55" stop-color="#d4a068"/>
+      <stop offset="0.85" stop-color="#b07a44"/>
+      <stop offset="1" stop-color="#83552e"/>
     </linearGradient>
     <linearGradient id="mWoodShade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#000" stop-opacity="0"/>
-      <stop offset="1" stop-color="#000" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
     </linearGradient>
     <linearGradient id="mWoodTop" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#8c5a2a"/>
-      <stop offset="0.5" stop-color="#d09a5a"/>
-      <stop offset="1" stop-color="#8c5a2a"/>
+      <stop offset="0" stop-color="#c99459"/>
+      <stop offset="0.5" stop-color="#ebc08b"/>
+      <stop offset="1" stop-color="#c99459"/>
     </linearGradient>
     <radialGradient id="mSlotGlow" cx="50%" cy="50%" r="50%">
       <stop offset="0" stop-color="#ffd08a" stop-opacity="0.75"/>
@@ -366,7 +378,7 @@ def compose_mockup_svg(tpl: Template, star_layer_svg: str, personalization) -> s
     <filter id="mSoft"><feGaussianBlur stdDeviation="18"/></filter>
     <filter id="mGrain" x="0" y="0" width="100%" height="100%">
       <feTurbulence type="fractalNoise" baseFrequency="0.012 0.35" numOctaves="2" seed="7"/>
-      <feColorMatrix values="0 0 0 0 0.18  0 0 0 0 0.09  0 0 0 0 0.03  0 0 0 0.9 -0.35"/>
+      <feColorMatrix values="0 0 0 0 0.35  0 0 0 0 0.19  0 0 0 0 0.07  0 0 0 0.8 -0.38"/>
       <feComposite in2="SourceGraphic" operator="in"/>
     </filter>
     <clipPath id="mStarArea"><path d="{area}"/></clipPath>
@@ -378,15 +390,17 @@ def compose_mockup_svg(tpl: Template, star_layer_svg: str, personalization) -> s
   <ellipse cx="{cx}" cy="{tpl.circle_cy}" rx="{tpl.circle_r * 1.55}" ry="{tpl.circle_r * 1.45}" fill="url(#mHalo)"/>
   <!-- masa yuzeyine vuran isik ve golge -->
   <ellipse cx="{cx}" cy="{front_b}" rx="{base_w * 0.85}" ry="70" fill="url(#mTable)"/>
-  <ellipse cx="{cx}" cy="{front_b + 4}" rx="{base_w * 0.52}" ry="14" fill="#000" opacity="0.55" filter="url(#mSoft)"/>
+  <ellipse cx="{cx}" cy="{front_b - 4}" rx="{base_w * 0.5}" ry="14" fill="#000" opacity="0.55" filter="url(#mSoft)"/>
 
-  <!-- ahsap taban: on yuz + ust yuz -->
-  <rect x="{base_l}" y="{slot_y}" width="{base_w}" height="{front_b - slot_y}" rx="26" fill="url(#mWoodFront)"/>
-  <rect x="{base_l}" y="{slot_y}" width="{base_w}" height="{front_b - slot_y}" rx="26" fill="#000" filter="url(#mGrain)"/>
-  <rect x="{base_l}" y="{slot_y}" width="{base_w}" height="{front_b - slot_y}" rx="26" fill="url(#mWoodShade)"/>
-  <rect x="{base_l}" y="{top_y}" width="{base_w}" height="{top_h}" rx="{top_h / 2}" fill="url(#mWoodTop)"/>
-  <rect x="{base_l}" y="{top_y}" width="{base_w}" height="{top_h}" rx="{top_h / 2}" fill="#000" filter="url(#mGrain)" opacity="0.7"/>
-  <ellipse cx="{cx}" cy="{slot_y}" rx="{base_w * 0.42}" ry="{top_h * 0.55}" fill="url(#mSlotGlow)"/>
+  <!-- kayin ahsap taban: yan yuz + ust yuz + akrilik yarigi -->
+  <path d="{side_face}" fill="url(#mWoodFront)"/>
+  <path d="{side_face}" fill="#000" filter="url(#mGrain)" opacity="0.6"/>
+  <path d="{side_face}" fill="url(#mWoodShade)"/>
+  <path d="{top_face}" fill="url(#mWoodTop)"/>
+  <path d="{top_face}" fill="#000" filter="url(#mGrain)" opacity="0.45"/>
+  <path d="{top_face}" fill="none" stroke="#f3d3a6" stroke-width="1" opacity="0.5"/>
+  <rect x="{slot_l}" y="{slot_y - 5}" width="{slot_r - slot_l}" height="10" rx="5" fill="#2b170a"/>
+  <ellipse cx="{cx}" cy="{slot_y}" rx="{base_w * 0.38}" ry="{top_ry * 1.1}" fill="url(#mSlotGlow)"/>
 
   <!-- akrilik plaka: tabana giren tirnak gizlenir -->
   <g clip-path="url(#mAboveSlot)">
