@@ -1,0 +1,24 @@
+.yh-section {
+  width: 100%;
+  max-width: 1280px;
+  margin: 24px auto;
+  padding: 0 12px;
+  box-sizing: border-box;
+}
+.yh-frame {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 16px;
+  background: #0b1026;
+}
+.yh-status {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.yh-status--info { background: #f4f1ea; border: 1px solid #ddd3bf; color: #4a3f2a; }
+.yh-status--ok { background: #f3faf3; border: 1px solid #9ccf9c; color: #1d4d1d; }
+.yh-status--error { background: #fff6e5; border: 1px solid #f0c36d; color: #6b4a00; }

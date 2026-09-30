@@ -1,0 +1,75 @@
+[
+ {
+  "name": "product",
+  "displayName": "Ürün",
+  "type": "PRODUCT",
+  "required": true
+ },
+ {
+  "name": "designerUrl",
+  "displayName": "Tasarım adresi (tünel)",
+  "type": "TEXT",
+  "required": true,
+  "defaultValue": "https://BURAYA-TUNEL-ADRESI"
+ },
+ {
+  "name": "designOptionName",
+  "displayName": "Tasarım No seçeneğinin adı",
+  "type": "TEXT",
+  "defaultValue": "Tasarım No"
+ },
+ {
+  "name": "woodOptionName",
+  "displayName": "Ahşap kazıma seçeneğinde geçen kelime",
+  "type": "TEXT",
+  "defaultValue": "Ahşap"
+ },
+ {
+  "name": "frameHeight",
+  "displayName": "Yükseklik",
+  "type": "TEXT",
+  "defaultValue": "min(100vh, 900px)"
+ },
+ {
+  "name": "autoAddToCart",
+  "displayName": "Onaylanınca sepete ekle",
+  "type": "BOOLEAN",
+  "defaultValue": true
+ },
+ {
+  "name": "frameTitle",
+  "displayName": "Başlık (erişilebilirlik)",
+  "type": "TEXT",
+  "defaultValue": "Yıldız Haritası Tasarla"
+ },
+ {
+  "name": "addingText",
+  "displayName": "Sepete ekleniyor",
+  "type": "TEXT",
+  "defaultValue": "Tasarımınız onaylandı, sepete ekleniyor…"
+ },
+ {
+  "name": "addedText",
+  "displayName": "Sepete eklendi",
+  "type": "TEXT",
+  "defaultValue": "✓ Tasarımınız sepete eklendi. Tasarım No:"
+ },
+ {
+  "name": "filledText",
+  "displayName": "Alanlar dolduruldu (otomatik ekleme kapalı)",
+  "type": "TEXT",
+  "defaultValue": "✓ Tasarımınız onaylandı, Sepete Ekle ile devam edebilirsiniz. Tasarım No:"
+ },
+ {
+  "name": "errorText",
+  "displayName": "Hata",
+  "type": "TEXT",
+  "defaultValue": "Sepete eklenemedi. Lütfen Sepete Ekle düğmesini kullanın. Tasarım No:"
+ },
+ {
+  "name": "missingOptionText",
+  "displayName": "Seçenek bulunamadı",
+  "type": "TEXT",
+  "defaultValue": "Ürünün Tasarım No kişiselleştirme alanı bulunamadı."
+ }
+]
