@@ -19,3 +19,6 @@ env/
 # macOS
 .DS_Store
 __MACOSX/
+
+# Musteri siparisleri (yerel bilgisayarda kalir)
+backend/orders/

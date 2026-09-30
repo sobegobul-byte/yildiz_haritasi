@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yıldız Haritası iframe örneği</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f6f3ee; }
+    .kutu { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    /* iframe sabit yükseklik: alttaki "Sipariş ver" çubuğu her zaman görünür kalır */
+    #yildiz-haritasi { width: 100%; height: 100vh; min-height: 760px; border: 0; border-radius: 16px; display: block; }
+    #sonuc { margin-top: 16px; padding: 12px 16px; background: #fff; border-radius: 12px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="kutu">
+    <!-- 1) iframe: src'yi tünel adresinle değiştir (örn. https://harita.alanadin.com) -->
+    <iframe id="yildiz-haritasi" src="http://localhost:3000" allow="clipboard-write"></iframe>
+
+    <div id="sonuc"></div>
+  </div>
+
+  <script>
+    // 2) Müşteri tasarımı onaylayınca iframe bu mesajı gönderir.
+    //    Güvenlik: TÜNEL ADRESİN dışından gelen mesajları dikkate alma.
+    var HARITA_ADRESI = "http://localhost:3000";   // tünel adresinle değiştir
+
+    window.addEventListener("message", function (e) {
+      if (e.origin !== HARITA_ADRESI) return;
+      var m = e.data || {};
+      if (m.source !== "yildiz-haritasi" || m.type !== "approved") return;
+
+      var o = m.order;
+      // o.order_id      -> tasarım no (dosyalar: backend/orders/<order_id>/)
+      // o.location, o.date, o.time, o.lamp_lines, o.wood_text
+      // o.extra_price   -> ek ücret (ahşap kazıma seçildiyse 49.90)
+      //
+      // 3) Burada kendi sitenin sipariş/sepet adımına geç, örneğin:
+      //    - sepete ekle formundaki gizli alana o.order_id yaz
+      //    - ya da: window.location.href = "/sepet?tasarim=" + o.order_id;
+      var s = document.getElementById("sonuc");
+      s.style.display = "block";
+      s.textContent = "Onaylandı! Tasarım no: " + o.order_id +
+        " | Ek ücret: " + o.extra_price.toFixed(2).replace(".", ",") + " TL";
+    });
+  </script>
+</body>
+</html>

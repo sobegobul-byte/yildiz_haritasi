@@ -4,6 +4,9 @@ Yummy Light Store için mobil öncelikli yıldız haritası önizleme + üretim 
 Kullanıcı konum ve tarih girer → gerçek gökyüzü hesaplanır → ürün şablonunda canlı önizleme →
 kişiselleştirme → PDF (baskı) ve DXF (lazer kesim, 5 katman) export.
 
+## Web sitesine iframe ile ekleme
+Bkz. **[IFRAME-KURULUM.md](IFRAME-KURULUM.md)** — Mac'te `baslat-mac.command` + Cloudflare Tunnel.
+
 ## Kurulum
 
 ### 1) Backend (Python 3.10+)

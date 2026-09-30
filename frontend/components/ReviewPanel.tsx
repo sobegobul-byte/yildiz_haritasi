@@ -2,13 +2,13 @@
 import { useState } from "react";
 import PreviewCanvas from "@/components/PreviewCanvas";
 import {
-  MapConfig, Personalization, PreviewView, WOOD_ENGRAVING_PRICE, formatTL,
+  MapConfig, OrderSummary, Personalization, PreviewView, WOOD_ENGRAVING_PRICE, formatTL,
 } from "@/lib/api";
 
 // 3. adım: müşteri tasarımı büyük önizlemede kontrol edip onaylar.
 // Masaüstünde önizleme solda büyük, özet sağda; mobilde önizleme üstte.
 export default function ReviewPanel({
-  svg, loading, error, view, onViewChange, config, pers, approved, onBack, onApprove,
+  svg, loading, error, view, onViewChange, config, pers, approved, order, onBack, onApprove,
 }: {
   svg: string;
   loading: boolean;
@@ -18,10 +18,25 @@ export default function ReviewPanel({
   config: MapConfig;
   pers: Personalization;
   approved: boolean;
+  order: OrderSummary | null;
   onBack: () => void;
-  onApprove: () => void;
+  onApprove: () => Promise<void>;
 }) {
   const [checked, setChecked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const approve = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      await onApprove();
+    } catch (e: any) {
+      setErr(e.message || "Sipariş oluşturulamadı");
+    } finally {
+      setBusy(false);
+    }
+  };
   const [y, m, d] = config.date.split("-");
   const lines = [pers.title, pers.subtitle, pers.names, pers.message]
     .map((el) => el.content.trim())
@@ -78,6 +93,11 @@ export default function ReviewPanel({
         {approved ? (
           <div className="rounded-xl border border-starlight/40 bg-starlight/10 p-4 text-sm space-y-1">
             <p className="font-medium text-starlight">✓ Tasarımınız onaylandı</p>
+            {order && (
+              <p className="text-cream/80">
+                Tasarım no: <span className="font-mono font-semibold">{order.order_id}</span>
+              </p>
+            )}
             <p className="text-cream/60 text-xs">
               Onaylanan tasarım bu haliyle üretime alınacaktır.
             </p>
@@ -94,12 +114,13 @@ export default function ReviewPanel({
               Tasarımı kontrol ettim. Konum, tarih ve yazıların doğru olduğunu onaylıyorum.
               Onaydan sonra tasarım bu haliyle üretime alınır.
             </label>
+            {err && <p className="text-xs text-red-300">{err}</p>}
             <button
-              onClick={onApprove}
-              disabled={!checked || loading}
+              onClick={approve}
+              disabled={!checked || loading || busy}
               className="w-full rounded-lg bg-starlight text-night font-medium py-3 text-sm disabled:opacity-40"
             >
-              Tasarımı onaylıyorum
+              {busy ? "Kaydediliyor…" : "Tasarımı onaylıyorum"}
             </button>
             <button
               onClick={onBack}

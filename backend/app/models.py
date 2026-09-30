@@ -29,7 +29,7 @@ Align = Literal["start", "middle", "end"]   # SVG text-anchor: sol / orta / sag
 
 
 class TextElement(BaseModel):
-    content: str = ""
+    content: str = Field("", max_length=300)
     font_size: float = 20.0      # SVG birimi (px @ 600 genislik)
     align: Align = "middle"
     dx: float = 0.0              # yatay ofset (slot merkezine gore)
@@ -47,7 +47,7 @@ class Personalization(BaseModel):
     message: TextElement = TextElement(content="", font_size=16)
     # ek hizmet: ahsap tabanin on yuzune yazi kazima (+49,90 TL)
     wood_engraving: bool = False
-    wood_text: str = ""
+    wood_text: str = Field("", max_length=120)
 
 
 class PreviewRequest(BaseModel):

@@ -1,6 +1,9 @@
 """FastAPI uygulamasi. Calistirma: uvicorn app.main:app --reload --port 8000"""
 from __future__ import annotations
+import json
+import secrets
 from datetime import datetime
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -106,3 +109,57 @@ def api_export_wood_dxf(req: ExportRequest):
         raise HTTPException(status_code=422, detail="Ahşap yazısı alana sığmıyor")
     return Response(content=build_wood_dxf(p), media_type="application/dxf",
                     headers={"Content-Disposition": 'attachment; filename="ahsap-yazi.dxf"'})
+
+
+# ---------------------------------------------------------------------------
+# Siparis: musteri tasarimi onaylayinca uretim dosyalari bu bilgisayara kaydedilir.
+# backend/orders/<siparis-no>/ : siparis.json, lamba.pdf, lamba.dxf,
+# ahsap-yazi.dxf (varsa), onizleme.svg (musterinin onayladigi urun gorunumu)
+# ---------------------------------------------------------------------------
+ORDERS_DIR = Path(__file__).resolve().parent.parent / "orders"
+WOOD_ENGRAVING_PRICE = 49.90
+
+
+@app.post("/api/orders")
+def api_create_order(req: PreviewRequest):
+    tpl = TEMPLATES.get(req.template_id)
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Şablon bulunamadı")
+    mockup = _compose(req, "mockup")          # bos tarih/koordinat satirlarini da doldurur
+    p = req.personalization
+    if layout_text(tpl, p)[1]:
+        raise HTTPException(status_code=422, detail="Yazılar lamba alanına sığmıyor")
+    wood = p.wood_engraving and bool(p.wood_text.strip())
+    if wood and layout_wood_text(p.wood_text)[2]:
+        raise HTTPException(status_code=422, detail="Ahşap yazısı alana sığmıyor")
+
+    now = datetime.now()
+    order_id = now.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(2).upper()
+    d = ORDERS_DIR / order_id
+    d.mkdir(parents=True, exist_ok=False)
+
+    (d / "onizleme.svg").write_text(mockup, encoding="utf-8")
+    (d / "lamba.pdf").write_bytes(build_pdf(tpl, req.config, p))
+    (d / "lamba.dxf").write_bytes(build_dxf(tpl, req.config, p))
+    if wood:
+        (d / "ahsap-yazi.dxf").write_bytes(build_wood_dxf(p))
+
+    extra = WOOD_ENGRAVING_PRICE if wood else 0.0
+    summary = {
+        "order_id": order_id,
+        "created_at": now.isoformat(timespec="seconds"),
+        "location": req.config.location.display,
+        "lat": req.config.location.lat,
+        "lon": req.config.location.lon,
+        "date": req.config.date,
+        "time": req.config.time,
+        "lamp_lines": [el.content for el in (p.title, p.subtitle, p.names, p.message)
+                       if el.visible and el.content.strip()],
+        "wood_engraving": wood,
+        "wood_text": p.wood_text.strip() if wood else "",
+        "extra_price": extra,
+    }
+    (d / "siparis.json").write_text(
+        json.dumps({**summary, "request": req.model_dump()}, ensure_ascii=False, indent=2),
+        encoding="utf-8")
+    return summary

@@ -4,7 +4,7 @@ import { ExportFormat, MapConfig, Personalization, downloadExport } from "@/lib/
 
 // Alt çubuk: müşteri için "Sipariş ver"; yanında küçük imalat dosyası düğmeleri.
 export default function ExportBar({
-  config, pers, blocked, woodBlocked, orderDisabledReason, onOrder,
+  config, pers, blocked, woodBlocked, orderDisabledReason, onOrder, showProductionFiles,
 }: {
   config: MapConfig;
   pers: Personalization;
@@ -12,6 +12,7 @@ export default function ExportBar({
   woodBlocked: boolean;
   orderDisabledReason: string;
   onOrder: () => void;
+  showProductionFiles: boolean;   // web sitesinde (iframe) müşteriye gösterilmez
 }) {
   const [busy, setBusy] = useState<"" | ExportFormat>("");
   const wood = pers.wood_engraving && pers.wood_text.trim() !== "";
@@ -30,7 +31,7 @@ export default function ExportBar({
   return (
     <div className="fixed bottom-0 inset-x-0 bg-nightdeep/90 backdrop-blur border-t border-cream/10 p-3">
       <div className="mx-auto max-w-md md:max-w-5xl flex flex-col-reverse gap-2 md:flex-row md:items-center">
-        <div className="flex items-center gap-1.5">
+        {showProductionFiles && <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-cream/35 mr-1">İmalat:</span>
           <button onClick={() => run("pdf")} disabled={!!busy || blocked} className={small}>
             {busy === "pdf" ? "…" : "PDF"}
@@ -43,7 +44,7 @@ export default function ExportBar({
               {busy === "wood-dxf" ? "…" : "Ahşap DXF"}
             </button>
           )}
-        </div>
+        </div>}
         <div className="flex-1 md:text-right">
           {orderDisabledReason && (
             <p className="mb-1 text-[11px] text-red-300 md:inline md:mr-3">{orderDisabledReason}</p>

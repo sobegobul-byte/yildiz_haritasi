@@ -5,8 +5,9 @@ import PreviewCanvas from "@/components/PreviewCanvas";
 import TextEditor from "@/components/TextEditor";
 import ExportBar from "@/components/ExportBar";
 import ReviewPanel from "@/components/ReviewPanel";
+import { isEmbedded, notifyParent } from "@/lib/embed";
 import {
-  MapConfig, Personalization, PreviewView, emptyEl, fetchPreview,
+  MapConfig, OrderSummary, Personalization, PreviewView, createOrder, emptyEl, fetchPreview,
 } from "@/lib/api";
 
 const defaultPersonalization = (): Personalization => ({
@@ -25,6 +26,10 @@ type Stage = "design" | "review" | "approved";
 
 export default function Home() {
   const [stage, setStage] = useState<Stage>("design");
+  const [order, setOrder] = useState<OrderSummary | null>(null);
+  // iframe içinde (web sitesinde) müşteri modu: imalat düğmeleri gizli
+  const [embedded, setEmbedded] = useState(false);
+  useEffect(() => setEmbedded(isEmbedded()), []);
   const [config, setConfig] = useState<MapConfig | null>(null);
   const [pers, setPers] = useState<Personalization>(defaultPersonalization());
   const [svg, setSvg] = useState<string>("");
@@ -84,7 +89,14 @@ export default function Home() {
           config={config} pers={pers}
           approved={stage === "approved"}
           onBack={() => setStage("design")}
-          onApprove={() => setStage("approved")}
+          order={order}
+          onApprove={async () => {
+            const o = await createOrder(config, pers);
+            setOrder(o);
+            setStage("approved");
+            // web sitesi bu mesajı dinleyip sipariş/sepet adımına geçer
+            notifyParent("approved", { order: o });
+          }}
         />
       )}
 
@@ -112,6 +124,7 @@ export default function Home() {
       {config && stage === "design" && (
         <ExportBar
           config={config} pers={pers} blocked={overflow} woodBlocked={woodOverflow}
+          showProductionFiles={!embedded}
           orderDisabledReason={orderDisabledReason}
           onOrder={() => { setView("mockup"); setStage("review"); }}
         />

@@ -121,3 +121,30 @@ export async function downloadExport(
   a.click();
   URL.revokeObjectURL(url);
 }
+
+export interface OrderSummary {
+  order_id: string;
+  created_at: string;
+  location: string;
+  date: string;
+  time: string;
+  lamp_lines: string[];
+  wood_engraving: boolean;
+  wood_text: string;
+  extra_price: number;
+}
+
+// Onaylanan tasarımı siparişe çevirir: üretim dosyaları bu bilgisayarda
+// backend/orders/<sipariş-no>/ klasörüne kaydedilir.
+export async function createOrder(config: MapConfig, personalization: Personalization): Promise<OrderSummary> {
+  const r = await fetch("/api/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ config, personalization, template_id: "yummy-lamp" }),
+  });
+  if (!r.ok) {
+    const detail = await r.json().then((j) => j.detail).catch(() => "");
+    throw new Error(typeof detail === "string" && detail ? detail : "Sipariş oluşturulamadı, lütfen tekrar deneyin");
+  }
+  return r.json();
+}
