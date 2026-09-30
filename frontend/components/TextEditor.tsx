@@ -20,7 +20,10 @@ export default function TextEditor({
 
   return (
     <div className="rounded-2xl border border-cream/10 bg-nightdeep/50 p-4 space-y-3">
-      <h2 className="text-xs tracking-[0.25em] uppercase text-starlight/80 mb-2">Kişiselleştir</h2>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-starlight text-starlight text-xs font-semibold">2</span>
+        <h2 className="text-xs tracking-[0.2em] uppercase text-starlight/80">Kişiselleştir</h2>
+      </div>
       {FIELDS.map(({ key, label, multiline }) => {
         const el = pers[key];
         return (

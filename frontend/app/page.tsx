@@ -62,11 +62,11 @@ export default function Home() {
           />
         </section>
 
-        {/* Kontroller — gökyüzü oluşunca kişiselleştirme üste alınır ki
-            yazı yazarken sayfayı kaydırmak gerekmesin */}
+        {/* Adımlar sırayla: 1) konum/tarih -> yıldız haritası, 2) kişiselleştirme.
+            Harita oluşunca 1. adım tek satıra kapanır, yazarken kaydırma gerekmez. */}
         <section className="space-y-4 md:order-1">
-          {config && <TextEditor pers={pers} onChange={setPers} />}
           <LocationForm onResolved={setConfig} />
+          {config && <TextEditor pers={pers} onChange={setPers} />}
         </section>
       </div>
 

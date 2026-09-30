@@ -27,6 +27,7 @@ Tarayıcıda: http://localhost:3000  (API çağrıları otomatik olarak :8000'e 
   Sabit yıldızlar için Skyfield ile aynı sonucu veren saf matematik (presesyon düzeltmeli).
   Doğrulandı: Polaris yüksekliği = gözlemci enlemi ✓
 - `backend/data/stars.6.json` — d3-celestial yıldız kataloğu (mag ≤ 6, ~5000 yıldız)
+- `frontend/lib/tr-il-ilce.json` — 81 il ve 973 ilçe (PTT verisi, [turkey-neighbourhoods](https://github.com/muratgozel/turkey-neighbourhoods), MIT)
 - `backend/app/template.py` — şablon geometrisi TEK yerde; önizleme = PDF = DXF (gördüğün = alacağın)
 - `backend/app/exporters.py` — DXF katmanları: CUT / STAR_MAP / CONSTELLATIONS / TEXT / GUIDE
 
