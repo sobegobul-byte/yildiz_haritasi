@@ -93,3 +93,41 @@ NEXT_PUBLIC_PARENT_ORIGIN=https://alanadin.com
 
 - Mac kapanırsa, uyku moduna geçerse ya da internet kesilirse site de kapanır.
 - Konum koordinatları için OpenStreetMap kullanılır. İnternet yoksa il merkezi kullanılır.
+
+---
+
+# ikas entegrasyonu
+
+Müşteri ürün sayfasında tasarlar → onaylar → ikas'taki **Tasarım No** alanı otomatik dolar
+(ahşap kazıma seçildiyse o seçenek de işaretlenir, +49,90 TL'yi ikas ekler) → **Sepete Ekle**.
+
+## 1) Ürün (ikas panel → Ürünler)
+
+"Yıldız Haritası Gece Lambası" ürününe **Kişiselleştirme** ekle:
+
+| Ad | Tür | Fiyat | Zorunlu |
+|---|---|---|---|
+| `Tasarım No` | Yazı / metin | 0 | **Evet** (tasarım onaylanmadan sepete eklenemez) |
+| `Ahşap Tabana Yazı Kazıma` | Seçenek / onay kutusu | **49,90** | Hayır |
+
+Adlar önemli: script alanları bu başlıklardan bulur ("Tasarım No" ve "Ahşap" kelimesi).
+
+## 2) Script (ikas panel → Satış Kanalları → mağaza → Eklentiler → Scriptler → Script Ekle)
+
+`web-sitesi/ikas-script.js` dosyasının tamamını `<script>` ... `</script>` arasına yapıştır ve
+en üstteki iki ayarı değiştir:
+
+```js
+HARITA_ADRESI: "https://harita.alanadin.com",        // tünel adresin
+URUN_YOLU: "/yildiz-haritasi-gece-lambasi",          // ürün sayfası adresindeki kısım
+```
+
+## 3) Test
+
+1. Mac'te `baslat-mac.command` çalışıyor olsun, tünel adresi `HARITA_ADRESI` ile aynı olsun.
+2. Ürün sayfasını aç: ürün bilgisinin altında tasarım ekranı görünmeli.
+3. Tasarla → Sipariş ver → onayla: sayfa Sepete Ekle'ye kayar, Tasarım No dolmuş olur.
+4. Sepete ekle → siparişte **Tasarım No** görünür → dosyalar `backend/orders/<Tasarım No>/`.
+
+Tasarım ekranı görünmezse / alan dolmazsa: tarayıcıda F12 → Console'da `[yildiz-haritasi]`
+satırlarına bak. Yeri elle seçmek için `YER_SECICI` ayarına bir CSS seçici yazılabilir.
