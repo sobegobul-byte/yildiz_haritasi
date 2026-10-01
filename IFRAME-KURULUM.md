@@ -162,3 +162,35 @@ URUN_YOLU: "/yildiz-haritasi-gece-lambasi",          // ürün sayfası adresind
 
 Tasarım ekranı görünmezse / alan dolmazsa: tarayıcıda F12 → Console'da `[yildiz-haritasi]`
 satırlarına bak. Yeri elle seçmek için `YER_SECICI` ayarına bir CSS seçici yazılabilir.
+
+## 6) Analiz (anonim kullanım verileri)
+
+Tasarım aracındaki adımlar anonim olarak bu bilgisayara kaydedilir
+(`backend/analytics/olaylar-YYYY-AA.jsonl`, git'e gönderilmez). İsim, e-posta, IP ve
+lambaya yazılan metinler kaydedilmez; oturum kimliği tarayıcıda üretilen rastgele bir değerdir.
+
+**Panel:** site çalışırken bu bilgisayarda tarayıcıda `http://127.0.0.1:8000/panel`
+(tünelden erişilemez). İçerik: adım adım ilerleme (açtı → konum → tarih → yazı → onay →
+sepet → satın aldı), günlük ziyaret/onay, hediye amacı, iller/ilçeler, özel günün kaç yıl
+önce olduğu, yıldönümüne kalan gün, ay dağılımı, ahşap kazıma oranı, mobil oranı.
+"Satın aldı" adımı ikas eşlemesinden gelir (bkz. 5. bölüm).
+
+**Bu hediye ne için?** 1. adımda isteğe bağlı seçenekler; seçilen amaç `siparis.json`
+dosyasına (`occasion`) de yazılır.
+
+**GA4 + Meta Pixel:** `web-sitesi/analitik-script.js` dosyasının tamamını ikas panelinde
+Scriptler bölümüne `<script>...</script>` arasında ekle. Olaylar:
+
+| Adım | GA4 olayı | Meta Pixel |
+|---|---|---|
+| Uygulamayı açtı | `yildiz_haritasi_acildi` | `YildizHaritasiAcildi` |
+| Konum seçti | `yildiz_haritasi_konum` (province, district) | `YildizHaritasiKonum` |
+| Harita oluştu | `yildiz_haritasi_tarih` (kind, month, years_ago, days_to_anniv, occasion) | `YildizHaritasiTarih` |
+| Yazı yazdı | `yildiz_haritasi_yazi` | `YildizHaritasiYazi` |
+| Onayladı | `yildiz_haritasi_onay` (wood, occasion) | `YildizHaritasiOnay` + `CustomizeProduct` |
+| Sepete ekledi | `yildiz_haritasi_sepet` (action) | `YildizHaritasiSepet` |
+
+Sepete ekleme ve satın alma (add_to_cart / purchase) zaten ikas tarafından gönderilir.
+"Diğer" seçeneğine yazılan serbest metin GA4/Meta'ya gönderilmez.
+KVKK: Çerez Politikası / Aydınlatma Metni'ne "tasarım aracındaki kullanım verileri anonim
+olarak analiz edilir" ifadesini ekle.

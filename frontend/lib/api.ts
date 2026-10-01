@@ -132,15 +132,20 @@ export interface OrderSummary {
   wood_engraving: boolean;
   wood_text: string;
   extra_price: number;
+  occasion?: string;
 }
 
 // Onaylanan tasarımı siparişe çevirir: üretim dosyaları bu bilgisayarda
 // backend/orders/<sipariş-no>/ klasörüne kaydedilir.
-export async function createOrder(config: MapConfig, personalization: Personalization): Promise<OrderSummary> {
+export async function createOrder(
+  config: MapConfig,
+  personalization: Personalization,
+  extra: { occasion?: string; occasion_other?: string; sid?: string } = {},
+): Promise<OrderSummary> {
   const r = await fetch("/api/orders", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ config, personalization, template_id: "yummy-lamp" }),
+    body: JSON.stringify({ config, personalization, template_id: "yummy-lamp", ...extra }),
   });
   if (!r.ok) {
     const detail = await r.json().then((j) => j.detail).catch(() => "");

@@ -56,6 +56,10 @@ class PreviewRequest(BaseModel):
     template_id: str = "yummy-lamp"
     # "mockup" = isikli urun gorunumu (sadece onizleme), "flat" = uretim cizimi
     view: Literal["flat", "mockup"] = "flat"
+    # siparis bilgisi (istege bagli): hediye amaci ve anonim analiz oturumu
+    occasion: str = Field("", max_length=40)
+    occasion_other: str = Field("", max_length=60)
+    sid: str = Field("", max_length=40)
 
 
 class ExportRequest(PreviewRequest):

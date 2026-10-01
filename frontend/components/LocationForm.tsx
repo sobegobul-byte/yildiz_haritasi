@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { geocode, MapConfig } from "@/lib/api";
 import TR from "@/lib/tr-il-ilce.json";
+import { dateInsights, track } from "@/lib/track";
 
 // 81 il ve ilçeleri (PTT verisi, turkey-neighbourhoods paketinden). Alfabetik sıralı.
 type Province = { code: string; name: string; districts: string[] };
@@ -15,7 +16,15 @@ const YEARS = Array.from({ length: THIS_YEAR + 2 - 1900 }, (_, i) => String(THIS
 // saat/dakika serbest yazılır: sadece rakam, en fazla 2 hane
 const digits = (v: string) => v.replace(/\D/g, "").slice(0, 2);
 
-export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig) => void }) {
+// "Bu hediye ne için?" (isteğe bağlı) — analiz ve sipariş notu için
+export const OCCASIONS = ["Yıldönümü", "Sevgililer Günü", "Doğum günü", "Evlilik / Nişan",
+  "Yeni doğan bebek", "Anma / Özlem", "Mezuniyet", "Diğer"];
+export type Occasion = { occasion: string; occasion_other: string };
+
+export default function LocationForm({ onResolved, onOccasion }: {
+  onResolved: (c: MapConfig) => void;
+  onOccasion?: (o: Occasion) => void;
+}) {
   const [provinceCode, setProvinceCode] = useState("");
   const [district, setDistrict] = useState("");
   // Tarih/saat açılır listelerle seçilir (iOS'un yerel tarih/saat kutuları boş görünüyor,
@@ -34,6 +43,8 @@ export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig
   useEffect(() => {
     if (day && Number(day) > daysInMonth) setDay("");
   }, [day, daysInMonth]);
+  const [occasion, setOccasion] = useState("");
+  const [occasionOther, setOccasionOther] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
@@ -54,6 +65,9 @@ export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig
     try {
       // "Merkez" ilçesi il merkezidir; konum aramasında il adı yeterli
       const loc = await geocode("Türkiye", province.name, district === "Merkez" ? "" : district);
+      const occ = { occasion, occasion_other: occasion === "Diğer" ? occasionOther.trim().slice(0, 60) : "" };
+      onOccasion?.(occ);
+      track("date", { ...dateInsights(date), hour: Number(hour), ...occ });
       onResolved({
         location: {
           lat: loc.lat,
@@ -125,7 +139,10 @@ export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig
             className={`${select} mt-1`}
             value={district}
             disabled={!province}
-            onChange={(e) => setDistrict(e.target.value)}
+            onChange={(e) => {
+              setDistrict(e.target.value);
+              if (province) track("location", { province: province.name, district: e.target.value });
+            }}
           >
             <option value="" disabled>{province ? "İlçe seçin" : "Önce il seçin"}</option>
             {province?.districts.map((d) => (
@@ -190,6 +207,38 @@ export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig
             aria-label="Dakika"
           />
         </div>
+      </div>
+
+      <div className="block text-xs text-cream/60">
+        Bu hediye ne için? <span className="text-cream/40">(isteğe bağlı)</span>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {OCCASIONS.map((o) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => setOccasion(occasion === o ? "" : o)}
+              aria-pressed={occasion === o}
+              className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                occasion === o
+                  ? "border-starlight bg-starlight/15 text-starlight"
+                  : "border-cream/15 text-cream/70 hover:border-cream/30"
+              }`}
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+        {occasion === "Diğer" && (
+          <input
+            className={`${field} mt-2`}
+            type="text"
+            maxLength={60}
+            placeholder="Kısaca yazın (ör. öğretmenler günü)"
+            value={occasionOther}
+            onChange={(e) => setOccasionOther(e.target.value)}
+            aria-label="Hediye amacı"
+          />
+        )}
       </div>
 
       {err && <p className="text-xs text-red-400">{err}</p>}

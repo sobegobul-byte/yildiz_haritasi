@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yıldız Haritası Analiz</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --border: #e4e2dc;
+    --grid: #ecebe6;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #77756f;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --bar: #2a78d6;
+    --bar-hover: #1c5cab;
+    --accent: #b8860b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-0: #111110;
+      --surface-1: #1a1a19;
+      --border: #2e2e2b;
+      --grid: #262624;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #8f8e86;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --bar: #3987e5;
+      --bar-hover: #86b6ef;
+      --accent: #e8c46a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #111110; --surface-1: #1a1a19; --border: #2e2e2b; --grid: #262624;
+    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+    --series-1: #3987e5; --series-2: #d95926; --bar: #3987e5; --bar-hover: #86b6ef; --accent: #e8c46a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--surface-0); color: var(--text-primary);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; justify-content: space-between; margin-bottom: 16px; }
+  h1 { margin: 0; font-size: 20px; font-weight: 600; }
+  .sub { color: var(--text-secondary); font-size: 13px; margin-top: 2px; }
+  .range { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface-1); }
+  .range button {
+    border: 0; background: none; color: var(--text-secondary); padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .range button + button { border-left: 1px solid var(--border); }
+  .range button[aria-pressed="true"] { background: var(--text-primary); color: var(--surface-1); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .tile, .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .tile .label { color: var(--text-secondary); font-size: 12px; }
+  .tile .value { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .tile .note { color: var(--text-muted); font-size: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+  .card h2 { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
+  .card .hint { color: var(--text-muted); font-size: 12px; margin-bottom: 12px; }
+  .wide { grid-column: 1 / -1; }
+  .bars { display: grid; gap: 6px; }
+  .row { display: grid; grid-template-columns: minmax(90px, 38%) 1fr; gap: 10px; align-items: center; cursor: default; }
+  .row .name { color: var(--text-secondary); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track { position: relative; height: 20px; display: flex; align-items: center; gap: 8px; }
+  .fill { height: 14px; background: var(--bar); border-radius: 0 4px 4px 0; min-width: 2px; transition: background .1s; }
+  .row:hover .fill, .row:focus-visible .fill { background: var(--bar-hover); }
+  .row:hover .name { color: var(--text-primary); }
+  .num { font-size: 12px; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .num small { color: var(--text-muted); }
+  .funnel .row { grid-template-columns: minmax(150px, 34%) 1fr; }
+  .drop { color: var(--text-muted); font-size: 11px; margin-left: 4px; }
+  .empty { color: var(--text-muted); font-size: 13px; padding: 8px 0; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: 220px; overflow: visible; }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .legend i { display: inline-block; width: 12px; height: 2px; vertical-align: middle; margin-right: 6px; border-radius: 1px; }
+  .tip {
+    position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); white-space: nowrap; display: none; z-index: 2;
+  }
+  .tip b { font-variant-numeric: tabular-nums; }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: var(--text-secondary); font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--grid); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-secondary); font-weight: 500; }
+  .err { color: #d03b3b; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tags span { border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: 12px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Yıldız Haritası · Analiz</h1>
+      <div class="sub">Anonim kullanım verileri · yalnızca bu bilgisayarda görünür</div>
+    </div>
+    <div class="range" role="group" aria-label="Zaman aralığı">
+      <button data-days="7">7 gün</button>
+      <button data-days="30" aria-pressed="true">30 gün</button>
+      <button data-days="90">90 gün</button>
+      <button data-days="0">Tümü</button>
+    </div>
+  </header>
+
+  <div id="msg"></div>
+  <section class="tiles" id="tiles"></section>
+
+  <section class="grid">
+    <div class="card wide">
+      <h2>Adım adım ilerleme</h2>
+      <div class="hint">Her adıma ulaşan ziyaretçi sayısı · yüzde: uygulamayı açanlara göre · gri: bir önceki adımdan kaybedilen</div>
+      <div class="bars funnel" id="funnel"></div>
+    </div>
+
+    <div class="card wide">
+      <h2>Günlük ziyaret ve onay</h2>
+      <div class="legend">
+        <span><i style="background:var(--series-1)"></i>Uygulamayı açan</span>
+        <span><i style="background:var(--series-2)"></i>Tasarımı onaylayan</span>
+      </div>
+      <div class="chart" id="daily"><div class="tip" id="dailyTip"></div></div>
+      <details>
+        <summary>Tablo olarak göster</summary>
+        <div id="dailyTable"></div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>Bu hediye ne için?</h2>
+      <div class="hint">Müşterinin seçtiği amaç (isteğe bağlı alan)</div>
+      <div class="bars" id="occasions"></div>
+      <div class="tags" id="occOther"></div>
+    </div>
+
+    <div class="card">
+      <h2>İller</h2>
+      <div class="hint">Haritası oluşturulan konumlar · üzerine gelince en çok seçilen ilçeler</div>
+      <div class="bars" id="provinces"></div>
+    </div>
+
+    <div class="card">
+      <h2>Özel günün kaç yıl önce olduğu</h2>
+      <div class="hint">Seçilen tarihe göre</div>
+      <div class="bars" id="yearsAgo"></div>
+    </div>
+
+    <div class="card">
+      <h2>Yıldönümüne kalan gün</h2>
+      <div class="hint">Müşteri hediyeyi kaç gün önceden hazırlıyor</div>
+      <div class="bars" id="toAnniv"></div>
+    </div>
+
+    <div class="card">
+      <h2>Özel günün ayı</h2>
+      <div class="hint">Kampanya zamanlaması için</div>
+      <div class="bars" id="months"></div>
+    </div>
+
+    <div class="card">
+      <h2>Tarih türü</h2>
+      <div class="hint">Geçmiş bir anı mı, yaklaşan bir gün mü</div>
+      <div class="bars" id="dateKind"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => n.toLocaleString("tr-TR");
+const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function bars(el, items, opts = {}) {
+  const box = $(el);
+  const total = opts.total ?? items.reduce((s, i) => s + i.count, 0);
+  const max = Math.max(1, ...items.map((i) => i.count));
+  if (!items.length || !total) { box.innerHTML = '<div class="empty">Henüz veri yok</div>'; return; }
+  box.innerHTML = items.map((i) => {
+    const w = (i.count / max) * 100;
+    const title = opts.title ? opts.title(i) : `${i.name}: ${fmt(i.count)} (%${pct(i.count, total)})`;
+    return `<div class="row" tabindex="0" title="${esc(title)}">
+      <div class="name">${esc(i.name)}</div>
+      <div class="track"><div class="fill" style="${i.count ? `width:calc(${w}% - 64px)` : "display:none"}"></div>
+        <span class="num">${fmt(i.count)} <small>%${pct(i.count, total)}</small></span></div>
+    </div>`;
+  }).join("");
+}
+
+function funnel(steps) {
+  const start = steps[0]?.count || 0;
+  if (!start) { $("funnel").innerHTML = '<div class="empty">Henüz veri yok</div>'; return; }
+  $("funnel").innerHTML = steps.map((s, i) => {
+    const prev = i ? steps[i - 1].count : s.count;
+    const lost = prev - s.count;
+    const w = (s.count / start) * 100;
+    return `<div class="row" tabindex="0" title="${esc(`${s.label}: ${fmt(s.count)} · açanların %${pct(s.count, start)}` + (i ? ` · önceki adımın %${pct(s.count, prev)}'i` : ""))}">
+      <div class="name">${esc(s.label)}</div>
+      <div class="track"><div class="fill" style="width:calc(${w}% - 120px)"></div>
+        <span class="num">${fmt(s.count)} <small>%${pct(s.count, start)}</small>${i && lost > 0 ? `<span class="drop">−${fmt(lost)}</span>` : ""}</span></div>
+    </div>`;
+  }).join("");
+}
+
+function tiles(d) {
+  const f = Object.fromEntries(d.funnel.map((s) => [s.key, s.count]));
+  const w = d.wood;
+  const dev = d.devices.mobile + d.devices.desktop;
+  const t = [
+    ["Ziyaretçi (oturum)", fmt(f.open || 0), `${pct(d.devices.mobile, dev)}% mobil`],
+    ["Tasarımı onaylayan", fmt(f.approved || 0), `açanların %${pct(f.approved || 0, f.open || 0)}'i`],
+    ["Satın alan", fmt(f.purchase || 0), `açanların %${pct(f.purchase || 0, f.open || 0)}'i`],
+    ["Ahşap kazıma", `%${pct(w.with_wood, w.approved)}`, `${fmt(w.with_wood)} / ${fmt(w.approved)} onayda`],
+  ];
+  $("tiles").innerHTML = t.map(([l, v, n]) =>
+    `<div class="tile"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div></div>`).join("");
+}
+
+function daily(rows) {
+  const box = $("daily"), tip = $("dailyTip");
+  box.querySelector("svg")?.remove();
+  $("dailyTable").innerHTML = `<table><thead><tr><th>Gün</th><th>Açan</th><th>Onaylayan</th><th>Satın alan</th></tr></thead><tbody>${
+    rows.slice().reverse().map((r) => `<tr><td>${r.day}</td><td>${r.open}</td><td>${r.approved}</td><td>${r.purchase}</td></tr>`).join("")}</tbody></table>`;
+  if (!rows.length) return;
+  const W = box.clientWidth || 800, H = 220, L = 36, R = 12, T = 10, B = 26;
+  const max = Math.max(4, ...rows.map((r) => r.open));
+  const niceMax = Math.ceil(max / 4) * 4;
+  const x = (i) => L + (rows.length === 1 ? (W - L - R) / 2 : (i / (rows.length - 1)) * (W - L - R));
+  const y = (v) => T + (1 - v / niceMax) * (H - T - B);
+  const path = (k) => rows.map((r, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(r[k]).toFixed(1)}`).join("");
+  const ticks = [0, 1, 2, 3, 4].map((i) => (niceMax / 4) * i);
+  const every = Math.max(1, Math.ceil(rows.length / 8));
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Günlük uygulamayı açan ve tasarımı onaylayan ziyaretçi sayısı");
+  svg.innerHTML = `
+    ${ticks.map((t) => `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/>
+      <text x="${L - 6}" y="${y(t) + 4}" text-anchor="end" font-size="11" fill="var(--text-muted)">${fmt(t)}</text>`).join("")}
+    ${rows.map((r, i) => i % every === 0 ? `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--text-muted)">${r.day.slice(8, 10)}.${r.day.slice(5, 7)}</text>` : "").join("")}
+    <path d="${path("open")}" fill="none" stroke="var(--series-1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="${path("approved")}" fill="none" stroke="var(--series-2)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <line id="cross" y1="${T}" y2="${H - B}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3 3" style="display:none"/>
+    <circle id="d1" r="4" fill="var(--series-1)" stroke="var(--surface-1)" stroke-width="2" style="display:none"/>
+    <circle id="d2" r="4" fill="var(--series-2)" stroke="var(--surface-1)" stroke-width="2" style="display:none"/>
+    <rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/>`;
+  box.prepend(svg);
+  const hit = svg.querySelector("#hit"), cross = svg.querySelector("#cross"), d1 = svg.querySelector("#d1"), d2 = svg.querySelector("#d2");
+  const show = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = ((ev.clientX - rect.left) / rect.width) * W;
+    const i = Math.max(0, Math.min(rows.length - 1, Math.round(((px - L) / (W - L - R)) * (rows.length - 1))));
+    const r = rows[i], cx = x(i);
+    for (const el of [cross, d1, d2]) el.style.display = "";
+    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx);
+    d1.setAttribute("cx", cx); d1.setAttribute("cy", y(r.open));
+    d2.setAttribute("cx", cx); d2.setAttribute("cy", y(r.approved));
+    tip.style.display = "block";
+    tip.innerHTML = `${r.day.split("-").reverse().join(".")}<br>Açan: <b>${r.open}</b> · Onaylayan: <b>${r.approved}</b>` + (r.purchase ? ` · Satın alan: <b>${r.purchase}</b>` : "");
+    const left = (cx / W) * rect.width;
+    tip.style.left = Math.min(rect.width - tip.offsetWidth, Math.max(0, left - tip.offsetWidth / 2)) + "px";
+    tip.style.top = "-8px";
+  };
+  hit.addEventListener("pointermove", show);
+  hit.addEventListener("pointerleave", () => { tip.style.display = "none"; for (const el of [cross, d1, d2]) el.style.display = "none"; });
+}
+
+let current = 30, last = null;
+async function load(days) {
+  current = days;
+  document.querySelectorAll(".range button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.days === days)));
+  try {
+    const r = await fetch(`/api/analytics?days=${days}`);
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    last = d;
+    $("msg").innerHTML = "";
+    tiles(d);
+    funnel(d.funnel);
+    daily(d.daily);
+    bars("occasions", d.occasions);
+    $("occOther").innerHTML = d.occasion_other.map((o) => `<span title="${o.count} kez">${esc(o.name)} · ${o.count}</span>`).join("");
+    bars("provinces", d.provinces, {
+      title: (p) => `${p.name}: ${p.count}\n` + p.districts.map((x) => `  ${x.name}: ${x.count}`).join("\n"),
+    });
+    bars("yearsAgo", d.years_ago);
+    bars("toAnniv", d.days_to_anniv);
+    bars("months", d.months);
+    bars("dateKind", d.date_kind);
+  } catch (e) {
+    $("msg").innerHTML = `<p class="err">Veriler alınamadı (${esc(e.message)}). Panel yalnızca bu bilgisayardan açılır: http://127.0.0.1:8000/panel</p>`;
+  }
+}
+document.querySelectorAll(".range button").forEach((b) => b.addEventListener("click", () => load(+b.dataset.days)));
+let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => last && daily(last.daily), 150); });
+load(30);
+setInterval(() => load(current), 60000);
+</script>
+</body>
+</html>

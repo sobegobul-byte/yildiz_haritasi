@@ -8,7 +8,7 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, Response
 
 from .models import LocationQuery, PreviewRequest, ExportRequest
 from .template import (TEMPLATES, compose_svg, compose_mockup_svg, layout_text,
@@ -16,7 +16,7 @@ from .template import (TEMPLATES, compose_svg, compose_mockup_svg, layout_text,
 from .starmap import render_star_layer
 from .exporters import build_pdf, build_dxf, build_wood_dxf
 from .geocode import geocode, format_coords
-from . import ikas_sync
+from . import analytics, ikas_sync
 
 app = FastAPI(title="Starmap Studio API", version="0.1.0")
 
@@ -184,9 +184,12 @@ def api_create_order(req: PreviewRequest):
         "wood_engraving": wood,
         "wood_text": p.wood_text.strip() if wood else "",
         "extra_price": extra,
+        "occasion": req.occasion.strip(),
+        "occasion_other": req.occasion_other.strip() if req.occasion == "Diğer" else "",
     }
     (d / "siparis.json").write_text(
-        json.dumps({**summary, "status": "pending", "request": req.model_dump()},
+        json.dumps({**summary, "status": "pending", "sid": req.sid,
+                    "request": req.model_dump(exclude={"sid"})},
                    ensure_ascii=False, indent=2),
         encoding="utf-8")
     _log_status(d, "pending")
@@ -211,7 +214,22 @@ def _move_order(order_id: str, status: str, **extra) -> str | None:
     target.parent.mkdir(parents=True, exist_ok=True)
     d.rename(target)
     _log_status(target, status, **extra)
+    if status == "completed":
+        _record_purchase(target)
     return status
+
+
+def _record_purchase(d: Path):
+    """Satin alinan siparisi analiz hunisine 'purchase' adimi olarak yazar."""
+    try:
+        data = json.loads((d / "siparis.json").read_text(encoding="utf-8"))
+        if data.get("sid"):
+            analytics.record({"name": "purchase", "sid": data["sid"], "mobile": False,
+                              "embedded": True,
+                              "props": {"occasion": data.get("occasion", ""),
+                                        "wood": bool(data.get("wood_engraving"))}})
+    except Exception:
+        pass
 
 
 def _is_local(request: Request) -> bool:
@@ -256,3 +274,31 @@ def api_ikas_sync(request: Request):
     return {**ikas_sync.sync_once(_complete_from_ikas),
             "last_run": ikas_sync.state["last_run"],
             "recent": ikas_sync.state["completed"]}
+
+
+# ---------------------------------------------------------------------------
+# Anonim kullanim analizi
+#   POST /api/events      : tasarim aracindan gelen adim kayitlari (herkese acik)
+#   GET  /api/analytics   : ozet (yalnizca bu bilgisayardan)
+#   GET  /panel           : analiz paneli -> http://127.0.0.1:8000/panel
+# ---------------------------------------------------------------------------
+@app.post("/api/events", status_code=204)
+def api_event(ev: analytics.Event):
+    if ev.name == "purchase":                 # satin alma yalnizca ikas eslemesinden gelir
+        raise HTTPException(status_code=400, detail="Geçersiz olay")
+    analytics.record(ev)
+    return Response(status_code=204)
+
+
+@app.get("/api/analytics")
+def api_analytics(request: Request, days: int = 30):
+    if not _is_local(request):
+        raise HTTPException(status_code=403, detail="Yalnızca yerelden")
+    return analytics.summary(max(0, min(days, 3650)))
+
+
+@app.get("/panel", response_class=HTMLResponse)
+def panel(request: Request):
+    if not _is_local(request):
+        raise HTTPException(status_code=403, detail="Yalnızca yerelden")
+    return (Path(__file__).resolve().parent / "panel.html").read_text(encoding="utf-8")

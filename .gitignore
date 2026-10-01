@@ -26,3 +26,6 @@ backend/orders/
 
 # ikas API anahtarlari (yerelde kalir)
 backend/ikas-ayar.txt
+
+# Anonim kullanim analizi kayitlari (yerelde kalir)
+backend/analytics/
