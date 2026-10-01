@@ -16,17 +16,28 @@ python -m venv backend\.venv
 backend\.venv\Scripts\python.exe -m pip install -q -r backend\requirements.txt
 :venvok
 
-if exist "frontend\node_modules" goto :nodeok
+if exist "frontend\node_modules\.bin\next.cmd" goto :nodeok
 echo -^> Node paketleri kuruluyor, ilk sefer...
 pushd frontend
 call npm install --no-audit --no-fund
 popd
+if not exist "frontend\node_modules\.bin\next.cmd" goto :npmfail
 :nodeok
 
 echo -^> Site derleniyor...
 pushd frontend
 call npm run build
-if errorlevel 1 goto :buildfail
+if errorlevel 1 goto :npmfail
+echo.
+echo HATA: Node paketleri kurulamadi. TAR_ENTRY_ERROR gorduyseniz:
+echo  1. Projeyi OneDrive disinda kisa bir klasore tasiyin, ornek C:\yildiz
+echo  2. frontend\node_modules klasorunu silin
+echo  3. cmd'de calistirin: npm cache clean --force
+echo  4. baslat.bat'i tekrar calistirin
+pause
+exit /b 1
+
+:buildfail
 popd
 
 start "Yildiz Backend - port 8000" /min cmd /c "backend\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --app-dir backend"
@@ -64,6 +75,16 @@ exit /b 1
 
 :nonode
 echo HATA: Node.js bulunamadi. https://nodejs.org adresinden LTS surumunu kurun.
+pause
+exit /b 1
+
+:npmfail
+echo.
+echo HATA: Node paketleri kurulamadi. TAR_ENTRY_ERROR gorduyseniz:
+echo  1. Projeyi OneDrive disinda kisa bir klasore tasiyin, ornek C:\yildiz
+echo  2. frontend\node_modules klasorunu silin
+echo  3. cmd'de calistirin: npm cache clean --force
+echo  4. baslat.bat'i tekrar calistirin
 pause
 exit /b 1
 
