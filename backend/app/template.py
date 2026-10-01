@@ -4,6 +4,7 @@ Sablon geometrisi tek yerde tanimlidir; onizleme, PDF ve DXF ayni geometriden ur
 Birimler: SVG kullanici birimi. classic-portrait: 600 x 900 (2:3 oran, 20x30 cm baskiya birebir).
 """
 from __future__ import annotations
+from pathlib import Path
 import math
 from dataclasses import dataclass, field
 
@@ -366,39 +367,87 @@ def compose_svg(tpl: Template, star_layer_svg: str, personalization) -> str:
 # Kisa yazi tek satir; uzun yazi dengeli 2 satira bolunur, boyut otomatik.
 # ---------------------------------------------------------------------------
 WOOD_MM = {"w": 65.0, "h": 13.0, "base_h": 16.0}
-WOOD_FONT_MAX_1 = 8.0      # tek satir en buyuk font (mm) ~5.5 mm buyuk harf
-WOOD_FONT_MAX_2 = 5.4      # iki satirda en buyuk font (mm): 2 satir 13 mm'ye sigar
+# Yazi alani 65 x 13 mm sabit: yazi genisligi 65 mm'yi doldurana kadar buyur,
+# murekkep yuksekligi 13 mm'yi gecerse yukseklikten sinirlanir. En fazla 2 satir.
 WOOD_FONT_MIN = 3.0        # bunun altinda kazima okunmaz -> tasma
-WOOD_ONE_LINE_MIN = 4.5    # tek satir bundan kucuk kalacaksa 2 satira bolunur
-WOOD_LINE_H = 1.2
-_CAP_MID = 0.35            # satirin gorsel ortasi: taban cizgisinin ~0.35 font ustu
+WOOD_LINE_H = 1.15         # iki satir arasi taban cizgisi mesafesi (font boyu cinsinden)
+WOOD_TWO_LINE_GAIN = 1.15  # iki satir ancak yaziyi en az %15 buyutuyorsa secilir
+
+# Georgia gliflerinin taban cizgisine gore yaklasik dikey uzantilari (font boyu cinsinden)
+_TOP_ACCENT_CAPS = set("ÖÜİĞÂÎÛ")
+_TOP_TALL = set("ABCDEFGHIJKLMNOPQRSTUVWXYZÇŞ0123456789bdfhklt'\"!?&()/[]{}%#@")
+_TOP_MID = set("ijöüğâîû")
+_BOTTOM_DESC = set("gjpqyçşÇŞQJ,;()/[]{}345793@")   # Georgia rakamlari eski stil: 3,4,5,7,9 iner
+
+
+def _ink_top(s: str) -> float:
+    if any(c in _TOP_ACCENT_CAPS for c in s):
+        return 0.92
+    if any(c in _TOP_TALL for c in s):
+        return 0.74
+    if any(c in _TOP_MID for c in s):
+        return 0.70
+    return 0.49                                   # sadece kucuk harf govdesi (x-yuksekligi)
+
+
+def _ink_bottom(s: str) -> float:
+    return 0.24 if any(c in _BOTTOM_DESC for c in s) else 0.02
+
+
+_GEORGIA_TTF = None
+
+
+def _wood_width(s: str) -> float:
+    """1 mm font icin satir genisligi (mm). Bilgisayarda Georgia varsa onunla olculur."""
+    global _GEORGIA_TTF
+    from reportlab.pdfbase import pdfmetrics
+    if _GEORGIA_TTF is None:
+        _GEORGIA_TTF = ""
+        from reportlab.pdfbase.ttfonts import TTFont
+        for path in (r"C:\Windows\Fonts\georgia.ttf",
+                     "/System/Library/Fonts/Supplemental/Georgia.ttf",
+                     "/Library/Fonts/Georgia.ttf"):
+            try:
+                if Path(path).exists():
+                    pdfmetrics.registerFont(TTFont("GeorgiaWood", path))
+                    _GEORGIA_TTF = "GeorgiaWood"
+                    break
+            except Exception:
+                pass
+    if _GEORGIA_TTF:
+        return pdfmetrics.stringWidth(s, _GEORGIA_TTF, 1.0)
+    return text_width(s, 1.0)                     # Georgia yoksa guvenli tahmin
 
 
 def layout_wood_text(text: str) -> tuple[list, float, bool]:
-    """Ahsap yazisi: ([(satir, alan merkezine gore taban cizgisi dy_mm)], font_mm, tasma)."""
+    """Ahsap yazisi: ([(satir, alan merkezine gore taban cizgisi dy_mm)], font_mm, tasma).
+    Yazi 65 mm genislige kadar buyutulur; murekkep yuksekligi 13 mm'yi asamaz."""
     text = " ".join(text.split())
     if not text:
         return [], 0.0, False
-    W = WOOD_MM["w"]
+    W, H = WOOD_MM["w"], WOOD_MM["h"]
 
-    def fit(lines: list[str], fmax: float) -> float:
-        widest = max(text_width(ln, 1.0) for ln in lines)   # 1 mm font genisligi
-        return min(fmax, W / widest) if widest > 0 else fmax
+    def ink_h(lines: list[str]) -> float:          # 1 mm font icin murekkep yuksekligi
+        return _ink_top(lines[0]) + (len(lines) - 1) * WOOD_LINE_H + _ink_bottom(lines[-1])
 
-    lines, fs = [text], fit([text], WOOD_FONT_MAX_1)
+    def fit(lines: list[str]) -> float:
+        widest = max(_wood_width(ln) for ln in lines)
+        return min(W / widest if widest > 0 else H, H / ink_h(lines))
+
+    lines, fs = [text], fit([text])
     words = text.split()
-    if fs < WOOD_ONE_LINE_MIN and len(words) > 1:
+    if len(words) > 1:
         # en dengeli bolme noktasi (uzun satirin en kisa oldugu)
         best = min(range(1, len(words)),
-                   key=lambda i: max(text_width(" ".join(words[:i]), 1.0),
-                                     text_width(" ".join(words[i:]), 1.0)))
+                   key=lambda i: max(_wood_width(" ".join(words[:i])),
+                                     _wood_width(" ".join(words[i:]))))
         two = [" ".join(words[:best]), " ".join(words[best:])]
-        fs2 = fit(two, WOOD_FONT_MAX_2)
-        if fs2 > fs:
+        fs2 = fit(two)
+        if fs2 > fs * WOOD_TWO_LINE_GAIN:
             lines, fs = two, fs2
-    n = len(lines)
-    placed = [(ln, _CAP_MID * fs + (i - (n - 1) / 2) * WOOD_LINE_H * fs)
-              for i, ln in enumerate(lines)]
+    # murekkep kutusunu (ilk satir ustu - son satir alti) alanin dikey ortasina al
+    first = -ink_h(lines) * fs / 2 + _ink_top(lines[0]) * fs
+    placed = [(ln, first + i * WOOD_LINE_H * fs) for i, ln in enumerate(lines)]
     return placed, fs, fs < WOOD_FONT_MIN
 
 

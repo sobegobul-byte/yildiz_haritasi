@@ -65,18 +65,34 @@ Tasarım klasörü, siparişin durumuna göre `backend/orders/` altında taşın
 |---|---|
 | `pending/<tasarım-no>/` | Müşteri tasarımı onayladı |
 | `cart/<tasarım-no>/` | Müşteri **Sepete Ekle** veya **Hızlı Satın Al**'a bastı |
-| `completed/<tasarım-no>/` | Satın alındı (sen işaretlersin, aşağıya bak) |
+| `completed/<tasarım-no>/` | ikas'ta ödemesi tamamlandı (otomatik, aşağıya bak) |
 
 Her klasörde: `siparis.json` (bilgiler + durum geçmişi), `lamba.pdf`, `lamba.dxf`,
 `ahsap-yazi.dxf` (seçildiyse), `onizleme.svg`.
 
-**Satın alındı olarak işaretleme:** ikas'ta ödenen siparişteki **Tasarım No**'yu al ve
-- klasörü Finder'da `cart/` içinden `completed/` içine sürükle, **ya da**
-- Terminal'de (bu bilgisayarda):
-  ```
-  curl -X POST http://127.0.0.1:8000/api/orders/TASARIM-NO/status -H "Content-Type: application/json" -d '{"status":"completed"}'
-  ```
-Güvenlik: "completed" yalnızca bu bilgisayardan işaretlenebilir; tünel üzerinden gelen istek reddedilir.
+**Ödeme tamamlanınca otomatik `completed`:** backend 2 dakikada bir ikas'taki son 30 günün
+**ödenmiş** (PAID) siparişlerine bakar; siparişteki **Tasarım No** değerini bulursa klasörü
+`completed/` içine taşır ve `siparis.json` geçmişine ikas sipariş numarasını yazar.
+Havale/EFT gibi ödemesi bekleyen siparişler ödeme onaylanınca taşınır.
+
+Kurulum (bir kez):
+1. ikas panel → **Uygulamalar → Özel Uygulama (Geliştirici) oluştur** → izinlerden
+   **Siparişleri okuma** yetkisini ver → **Client ID** ve **Client Secret**'ı kopyala.
+2. `backend` klasöründe `ikas-ayar.txt` adlı bir dosya oluştur (git'e gönderilmez):
+   ```
+   MAGAZA=magazaadi
+   CLIENT_ID=buraya-client-id
+   CLIENT_SECRET=buraya-client-secret
+   ```
+   `MAGAZA`: ikas panel adresindeki `magazaadi.myikas.com` kısmının başı.
+3. `baslat.bat` / `baslat-mac.command` ile yeniden başlat.
+4. Kontrol (bu bilgisayarda tarayıcıda): `http://127.0.0.1:8000/api/ikas/sync`
+   → `"enabled": true` ve `"error": null` görmelisin.
+
+Elle işaretleme de mümkün (yalnızca bu bilgisayardan; tünelden gelen istek reddedilir):
+```
+curl -X POST http://127.0.0.1:8000/api/orders/TASARIM-NO/status -H "Content-Type: application/json" -d "{\"status\":\"completed\"}"
+```
 
 ## Onay ekranı ve mesajlar
 

@@ -16,6 +16,7 @@ from .template import (TEMPLATES, compose_svg, compose_mockup_svg, layout_text,
 from .starmap import render_star_layer
 from .exporters import build_pdf, build_dxf, build_wood_dxf
 from .geocode import geocode, format_coords
+from . import ikas_sync
 
 app = FastAPI(title="Starmap Studio API", version="0.1.0")
 
@@ -118,7 +119,7 @@ def api_export_wood_dxf(req: ExportRequest):
 # Durum klasorleri (tasarim klasoru durum degistikce tasinir):
 #   backend/orders/pending/<no>/    tasarim onaylandi
 #   backend/orders/cart/<no>/       musteri sepete ekledi / hizli satin al'a bast
-#   backend/orders/completed/<no>/  satin alindi (bu bilgisayardan isaretlenir)
+#   backend/orders/completed/<no>/  satin alindi (ikas'ta odeme tamamlaninca otomatik)
 # Icerik: siparis.json, lamba.pdf, lamba.dxf, ahsap-yazi.dxf (varsa), onizleme.svg
 # ---------------------------------------------------------------------------
 ORDERS_DIR = Path(__file__).resolve().parent.parent / "orders"
@@ -197,24 +198,61 @@ class StatusUpdate(BaseModel):
     action: Literal["add-to-cart", "buy-now", "manual"] = "manual"
 
 
+def _move_order(order_id: str, status: str, **extra) -> str | None:
+    """Tasarim klasorunu durum klasorune tasir; durum yalnizca ileri gider.
+    Tasidiysa yeni durumu, tasimadiysa None doner."""
+    found = _find_order(order_id)
+    if not found:
+        return None
+    cur, d = found
+    if STATUSES.index(status) <= STATUSES.index(cur):
+        return None
+    target = ORDERS_DIR / status / order_id
+    target.parent.mkdir(parents=True, exist_ok=True)
+    d.rename(target)
+    _log_status(target, status, **extra)
+    return status
+
+
+def _is_local(request: Request) -> bool:
+    """Tunel -> Next.js uzerinden gelen istekler x-forwarded-* basligi tasir."""
+    return not any(h in request.headers for h in ("x-forwarded-for", "x-forwarded-host"))
+
+
 @app.post("/api/orders/{order_id}/status")
 def api_order_status(order_id: str, body: StatusUpdate, request: Request):
     """Tasarim klasorunu durum klasorune tasir.
     - cart: musterinin tarayicisindan (Sepete Ekle / Hizli Satin Al) gelir.
-    - completed: sadece BU bilgisayardan dogrudan (127.0.0.1:8000) yapilabilir;
-      tunel -> Next.js uzerinden gelen istekler x-forwarded-* basligi tasir ve reddedilir.
+    - completed: ikas'ta odeme tamamlaninca otomatik (ikas_sync) ya da sadece
+      BU bilgisayardan dogrudan (127.0.0.1:8000); tunelden gelen istek reddedilir.
     Durum yalnizca ileri gider: pending -> cart -> completed."""
     found = _find_order(order_id)
     if not found:
         raise HTTPException(status_code=404, detail="Tasarım bulunamadı")
-    cur, d = found
-    via_proxy = any(h in request.headers for h in ("x-forwarded-for", "x-forwarded-host"))
-    if body.status == "completed" and via_proxy:
+    if body.status == "completed" and not _is_local(request):
         raise HTTPException(status_code=403, detail="Tamamlandı durumu yalnızca yerelden işaretlenir")
-    if STATUSES.index(body.status) <= STATUSES.index(cur):
-        return {"order_id": order_id, "status": cur}          # geri gitmez, tekrar zararsiz
-    target = ORDERS_DIR / body.status / order_id
-    target.parent.mkdir(parents=True, exist_ok=True)
-    d.rename(target)
-    _log_status(target, body.status, action=body.action)
-    return {"order_id": order_id, "status": body.status}
+    moved = _move_order(order_id, body.status, action=body.action)
+    return {"order_id": order_id, "status": moved or _find_order(order_id)[0]}
+
+
+# ---------------------------------------------------------------------------
+# ikas: odemesi tamamlanan siparislerin tasarimlari otomatik completed/'a tasinir
+# (backend/ikas-ayar.txt varsa birkac dakikada bir kontrol edilir)
+# ---------------------------------------------------------------------------
+def _complete_from_ikas(order_id: str, ikas_order: str) -> str | None:
+    return _move_order(order_id, "completed", action="ikas-paid", ikas_order=ikas_order)
+
+
+@app.on_event("startup")
+def _start_ikas_sync():
+    ikas_sync.start(_complete_from_ikas)
+
+
+@app.get("/api/ikas/sync")
+def api_ikas_sync(request: Request):
+    """Simdi kontrol et (yalnizca bu bilgisayardan): http://127.0.0.1:8000/api/ikas/sync"""
+    if not _is_local(request):
+        raise HTTPException(status_code=403, detail="Yalnızca yerelden")
+    return {**ikas_sync.sync_once(_complete_from_ikas),
+            "last_run": ikas_sync.state["last_run"],
+            "recent": ikas_sync.state["completed"]}

@@ -23,3 +23,6 @@ __MACOSX/
 
 # Musteri siparisleri (yerel bilgisayarda kalir)
 backend/orders/
+
+# ikas API anahtarlari (yerelde kalir)
+backend/ikas-ayar.txt
