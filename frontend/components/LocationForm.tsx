@@ -12,8 +12,8 @@ const DAYS = Array.from({ length: 31 }, (_, i) => pad(i + 1));
 const MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 const THIS_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: THIS_YEAR + 2 - 1900 }, (_, i) => String(THIS_YEAR + 1 - i));   // yeniden eskiye
-const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
-const MINUTES = Array.from({ length: 12 }, (_, i) => pad(i * 5));
+// saat/dakika serbest yazılır: sadece rakam, en fazla 2 hane
+const digits = (v: string) => v.replace(/\D/g, "").slice(0, 2);
 
 export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig) => void }) {
   const [provinceCode, setProvinceCode] = useState("");
@@ -27,7 +27,9 @@ export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig
   const [minute, setMinute] = useState("00");
   const daysInMonth = month ? new Date(Number(year || 2000), Number(month), 0).getDate() : 31;
   const date = day && month && year && Number(day) <= daysInMonth ? `${year}-${month}-${day}` : "";
-  const time = `${hour}:${minute}`;
+  const hourOk = hour !== "" && Number(hour) <= 23;
+  const minuteOk = minute !== "" && Number(minute) <= 59;
+  const time = `${pad(Number(hour || 0))}:${pad(Number(minute || 0))}`;
   // ay/yıl değişince o ayda olmayan gün seçili kalmasın (ör. 31 Şubat)
   useEffect(() => {
     if (day && Number(day) > daysInMonth) setDay("");
@@ -41,6 +43,10 @@ export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig
   const submit = async () => {
     if (!province || !district || !date) {
       setErr("İl, ilçe ve tarihi (gün, ay, yıl) seçin");
+      return;
+    }
+    if (!hourOk || !minuteOk) {
+      setErr("Saat 0–23, dakika 0–59 arasında olmalı");
       return;
     }
     setBusy(true);
@@ -155,17 +161,34 @@ export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig
 
       <div className="block text-xs text-cream/60">
         Saat
-        <div className="mt-1 grid grid-cols-2 gap-2">
-          <select className={select} value={hour} onChange={(e) => setHour(e.target.value)} aria-label="Saat">
-            {HOURS.map((h) => (
-              <option key={h} value={h}>{h}</option>
-            ))}
-          </select>
-          <select className={select} value={minute} onChange={(e) => setMinute(e.target.value)} aria-label="Dakika">
-            {MINUTES.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+        <div className="mt-1 flex items-center gap-2">
+          <input
+            className={`${field} text-center ${hourOk ? "" : "border-red-400/70"}`}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={2}
+            placeholder="SS"
+            value={hour}
+            onChange={(e) => { setHour(digits(e.target.value)); setErr(""); }}
+            onBlur={() => hour && hourOk && setHour(pad(Number(hour)))}
+            onFocus={(e) => e.target.select()}
+            aria-label="Saat"
+          />
+          <span className="text-cream/60 text-base">:</span>
+          <input
+            className={`${field} text-center ${minuteOk ? "" : "border-red-400/70"}`}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={2}
+            placeholder="DD"
+            value={minute}
+            onChange={(e) => { setMinute(digits(e.target.value)); setErr(""); }}
+            onBlur={() => minute && minuteOk && setMinute(pad(Number(minute)))}
+            onFocus={(e) => e.target.select()}
+            aria-label="Dakika"
+          />
         </div>
       </div>
 
