@@ -24,23 +24,16 @@ tüneli başlatır ve Mac'in uyumasını engeller. **Pencere açık kaldığı s
 
 - **Geçici (deneme için):** `tunel-adi.txt` yoksa pencerede
   `https://xxxx.trycloudflare.com` gibi bir adres çıkar. Her başlatmada **değişir**.
-- **Kalıcı (canlı kullanım için):** alan adın Cloudflare'deyse bir kez:
+- **Kalıcı (canlı kullanım için):** alan adı Cloudflare'de **Active** olduktan sonra bir kez
+  (Windows'ta cmd, Mac'te Terminal):
   ```
   cloudflared tunnel login
   cloudflared tunnel create yildiz-haritasi
-  cloudflared tunnel route dns yildiz-haritasi harita.alanadin.com
+  cloudflared tunnel route dns yildiz-haritasi harita.yummylightstore.com
   ```
-  Sonra `~/.cloudflared/config.yml` dosyasını oluştur:
-  ```
-  tunnel: yildiz-haritasi
-  credentials-file: /Users/KULLANICI_ADIN/.cloudflared/<tünel-id>.json
-  ingress:
-    - hostname: harita.alanadin.com
-      service: http://localhost:3000
-    - service: http_status:404
-  ```
-  ve proje klasörüne içinde sadece `yildiz-haritasi` yazan **`tunel-adi.txt`** koy.
-  Artık adres hep `https://harita.alanadin.com` olur.
+  `login` tarayıcıyı açar, orada alan adını seçin. Sonra proje klasörüne içinde sadece
+  `yildiz-haritasi` yazan **`tunel-adi.txt`** dosyasını koyun. Başlatıcı artık her açılışta
+  aynı adresle (`https://harita.yummylightstore.com`) tüneli başlatır; config.yml gerekmez.
 
 ## 4) Web sitene ekleme
 

@@ -49,7 +49,7 @@ goto :end
 :namedtunnel
 set /p TUNEL=<tunel-adi.txt
 echo -^> Kalici tunel baslatiliyor: %TUNEL%
-cloudflared tunnel run %TUNEL%
+cloudflared tunnel run --url http://localhost:3000 %TUNEL%
 goto :end
 
 :notunnel

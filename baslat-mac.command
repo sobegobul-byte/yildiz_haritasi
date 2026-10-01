@@ -50,7 +50,7 @@ if command -v cloudflared > /dev/null; then
   if [ -f tunel-adi.txt ]; then
     NAME="$(tr -d '[:space:]' < tunel-adi.txt)"
     echo "-> Kalıcı tünel başlatılıyor: $NAME"
-    cloudflared tunnel run "$NAME" &
+    cloudflared tunnel run --url http://localhost:3000 "$NAME" &
   else
     echo "-> Geçici tünel başlatılıyor (adres aşağıda 'trycloudflare.com' ile biter)"
     cloudflared tunnel --url http://localhost:3000 &
