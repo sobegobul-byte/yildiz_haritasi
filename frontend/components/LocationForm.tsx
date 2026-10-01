@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { geocode, MapConfig } from "@/lib/api";
 import TR from "@/lib/tr-il-ilce.json";
 
@@ -7,11 +7,31 @@ import TR from "@/lib/tr-il-ilce.json";
 type Province = { code: string; name: string; districts: string[] };
 const PROVINCES = TR as Province[];
 
+const pad = (n: number) => String(n).padStart(2, "0");
+const DAYS = Array.from({ length: 31 }, (_, i) => pad(i + 1));
+const MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+const THIS_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: THIS_YEAR + 2 - 1900 }, (_, i) => String(THIS_YEAR + 1 - i));   // yeniden eskiye
+const HOURS = Array.from({ length: 24 }, (_, i) => pad(i));
+const MINUTES = Array.from({ length: 12 }, (_, i) => pad(i * 5));
+
 export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig) => void }) {
   const [provinceCode, setProvinceCode] = useState("");
   const [district, setDistrict] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("21:00");
+  // Tarih/saat açılır listelerle seçilir (iOS'un yerel tarih/saat kutuları boş görünüyor,
+  // takvim bugünden açılıyor ve kutu taşıyordu)
+  const [day, setDay] = useState("");
+  const [month, setMonth] = useState("");
+  const [year, setYear] = useState("");
+  const [hour, setHour] = useState("21");
+  const [minute, setMinute] = useState("00");
+  const daysInMonth = month ? new Date(Number(year || 2000), Number(month), 0).getDate() : 31;
+  const date = day && month && year && Number(day) <= daysInMonth ? `${year}-${month}-${day}` : "";
+  const time = `${hour}:${minute}`;
+  // ay/yıl değişince o ayda olmayan gün seçili kalmasın (ör. 31 Şubat)
+  useEffect(() => {
+    if (day && Number(day) > daysInMonth) setDay("");
+  }, [day, daysInMonth]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
@@ -20,7 +40,7 @@ export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig
 
   const submit = async () => {
     if (!province || !district || !date) {
-      setErr("İl, ilçe ve tarih seçin");
+      setErr("İl, ilçe ve tarihi (gün, ay, yıl) seçin");
       return;
     }
     setBusy(true);
@@ -48,7 +68,7 @@ export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig
     }
   };
 
-  const field = "w-full rounded-lg bg-nightdeep border border-cream/15 px-3 py-2.5 text-sm focus:border-starlight/60 focus:outline-none disabled:opacity-40";
+  const field = "w-full rounded-lg bg-nightdeep border border-cream/15 px-3 py-2.5 text-base sm:text-sm focus:border-starlight/60 focus:outline-none disabled:opacity-40";
   const select = `${field} appearance-none bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22><path d=%22M1 1l5 5 5-5%22 fill=%22none%22 stroke=%22%23e8c46a%22 stroke-width=%221.5%22/></svg>')] bg-no-repeat bg-[position:right_0.8rem_center] pr-8`;
 
   if (done && province) {
@@ -109,15 +129,44 @@ export default function LocationForm({ onResolved }: { onResolved: (c: MapConfig
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="block text-xs text-cream/60">
-          Tarih
-          <input className={`${field} mt-1`} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
-        <label className="block text-xs text-cream/60">
-          Saat
-          <input className={`${field} mt-1`} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-        </label>
+      <div className="block text-xs text-cream/60">
+        Tarih
+        <div className="mt-1 grid grid-cols-[1fr_1.4fr_1.2fr] gap-2">
+          <select className={select} value={day} onChange={(e) => setDay(e.target.value)} aria-label="Gün">
+            <option value="" disabled>Gün</option>
+            {DAYS.map((d) => (
+              <option key={d} value={d} disabled={Number(d) > daysInMonth}>{Number(d)}</option>
+            ))}
+          </select>
+          <select className={select} value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Ay">
+            <option value="" disabled>Ay</option>
+            {MONTHS.map((m, i) => (
+              <option key={m} value={String(i + 1).padStart(2, "0")}>{m}</option>
+            ))}
+          </select>
+          <select className={select} value={year} onChange={(e) => setYear(e.target.value)} aria-label="Yıl">
+            <option value="" disabled>Yıl</option>
+            {YEARS.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="block text-xs text-cream/60">
+        Saat
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          <select className={select} value={hour} onChange={(e) => setHour(e.target.value)} aria-label="Saat">
+            {HOURS.map((h) => (
+              <option key={h} value={h}>{h}</option>
+            ))}
+          </select>
+          <select className={select} value={minute} onChange={(e) => setMinute(e.target.value)} aria-label="Dakika">
+            {MINUTES.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {err && <p className="text-xs text-red-400">{err}</p>}
